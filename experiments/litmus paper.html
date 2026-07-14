@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>리트머스 이온 이동 시뮬레이션</title>
+    <!-- Tailwind CSS CDN 로드 --><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 기본 적용 */
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        /* 라디오 버튼 포커스 시 기본 링 제거 (테두리로 대체) */
+        input[type="radio"]:focus {
+            box-shadow: none;
+            --tw-ring-opacity: 0;
+        }
+        /* 선택된 라디오 버튼 스타일 */
+        input[type="radio"]:checked {
+            background-color: #6366f1; /* indigo-500 */
+            border-color: #6366f1;
+        }
+        input[type="radio"] {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Ion Model Styles */
+        .ion-model {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            /* 애니메이션 속도를 8s로 설정 */
+            transition: all 8s ease-out, opacity 0.5s ease-in-out;
+        }
+        .ion-cation {
+            background-color: #ef4444; /* red-500 */
+            border: 2px solid #f87171; /* red-400 */
+        }
+        .ion-anion {
+            background-color: #3b82f6; /* blue-600 */
+            border: 2px solid #60a5fa; /* blue-400 */
+        }
+    </style>
+</head>
+<!-- 배경색 변경: bg-gray-100 -> bg-gradient-to-br from-indigo-50 to-purple-50 --><body class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen flex items-center justify-center p-4">
+
+    <!-- 카드 배경색 변경: bg-white -> bg-white --><div class="max-w-3xl w-full mx-auto bg-white p-6 md:p-8 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">
+            리트머스 종이 이온 이동 시뮬레이터
+        </h1>
+        <p class="text-center text-gray-600 mb-8">
+            용액 속 이온이 전하에 따라 어떻게 이동하는지 확인해 보세요.
+        </p>
+
+        <!-- 설정 (Controls) --><div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- 1. 리트머스 종이 선택 --><!-- 배경색 변경: bg-gray-50 -> bg-purple-50 --><div class="bg-purple-50 p-5 rounded-lg border border-purple-200">
+                <h3 class="text-lg font-semibold mb-3 text-gray-700">1. 리트머스 종이 선택</h3>
+                <div class="space-y-3">
+                    <!-- 라벨 배경색 변경: bg-white -> bg-purple-100, border-gray-300 -> border-purple-300, hover:border-red-500 -> hover:border-red-400 --><label for="litmus-red" class="flex items-center p-3 bg-purple-100 rounded-lg border border-purple-300 hover:border-red-400 transition-all cursor-pointer">
+                        <!-- 텍스트 색상 변경 없음 --><input type="radio" id="litmus-red" name="litmus" value="red" class="form-radio h-5 w-5 text-red-600 border-purple-400 focus:ring-red-500" checked>
+                        <span class="ml-3 font-medium text-red-600">붉은색 리트머스 종이</span>
+                    </label>
+                    <!-- 라벨 배경색 변경: bg-white -> bg-purple-100, border-gray-300 -> border-purple-300, hover:border-blue-500 -> hover:border-blue-400 --><label for="litmus-blue" class="flex items-center p-3 bg-purple-100 rounded-lg border border-purple-300 hover:border-blue-400 transition-all cursor-pointer">
+                        <!-- 텍스트 색상 변경 없음 --><input type="radio" id="litmus-blue" name="litmus" value="blue" class="form-radio h-5 w-5 text-blue-600 border-purple-400 focus:ring-blue-500">
+                        <span class="ml-3 font-medium text-blue-600">푸른색 리트머스 종이</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. 용액 선택 --><!-- 배경색 변경: bg-gray-50 -> bg-indigo-50 --><div class="bg-indigo-50 p-5 rounded-lg border border-indigo-200">
+                <h3 class="text-lg font-semibold mb-3 text-gray-700">2. 용액 선택</h3>
+                <div class="space-y-3">
+                    <!-- 라벨 배경색 변경: bg-white -> bg-indigo-100, border-gray-300 -> border-indigo-300, hover:border-gray-500 -> hover:border-gray-400 --><label for="solution-acid" class="flex items-center p-3 bg-indigo-100 rounded-lg border border-indigo-300 hover:border-gray-400 transition-all cursor-pointer">
+                        <input type="radio" id="solution-acid" name="solution" value="acid" class="form-radio h-5 w-5 text-gray-700 border-indigo-400 focus:ring-gray-600" checked>
+                        <span class="ml-3 font-medium text-gray-700">산성 용액 (예: HCl)</span>
+                    </label>
+                    <!-- 라벨 배경색 변경: bg-white -> bg-indigo-100, border-gray-300 -> border-indigo-300, hover:border-gray-500 -> hover:border-gray-400 --><label for="solution-base" class="flex items-center p-3 bg-indigo-100 rounded-lg border border-indigo-300 hover:border-gray-400 transition-all cursor-pointer">
+                        <input type="radio" id="solution-base" name="solution" value="base" class="form-radio h-5 w-5 text-gray-700 border-indigo-400 focus:ring-gray-600">
+                        <span class="ml-3 font-medium text-gray-700">염기성 용액 (예: NaOH)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 이온화 반응식 (Ionization Equation) --><div id="equation-display" class="mb-6 text-center h-8">
+            <!-- Content will be injected by JS --></div>
+
+        <!-- 실행 버튼 (Action Buttons) --><div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 mb-8">
+            <!-- 버튼 색상 변경: bg-blue-600 -> bg-indigo-600, hover:bg-blue-700 -> hover:bg-indigo-700, focus:ring-blue-500 -> focus:ring-indigo-500 --><button id="start-btn" class="w-full sm:w-60 px-10 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                시뮬레이션 시작
+            </button>
+            <!-- 버튼 색상 변경: bg-gray-500 -> bg-pink-500, hover:bg-gray-600 -> hover:bg-pink-600, focus:ring-gray-400 -> focus:ring-pink-400 --><button id="reset-btn" class="w-full sm:w-60 px-10 py-3 bg-pink-500 text-white font-bold rounded-lg shadow-md transition-all hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-opacity-50">
+                초기화
+            </button>
+        </div>
+
+        <!-- 시뮬레이션 영역 (Simulation Area) --><div class="mb-6">
+            <!-- 전극 표시 색상 변경: text-blue-600 -> text-indigo-700, text-red-600 -> text-pink-700 --><div class="flex justify-between items-center mb-2 px-2">
+                <span class="text-3xl font-bold text-indigo-700">(-)극</span>
+                <span class="text-3xl font-bold text-pink-700">(+)극</span>
+            </div>
+            
+            <!-- 리트머스 종이 --><!-- 배경색 변경: bg-gray-200 -> bg-indigo-100, border-gray-300 -> border-indigo-300 --><div id="litmus-paper-container" class="bg-indigo-100 p-2 rounded-lg">
+                <div id="litmus-paper" class="h-24 w-full rounded-md border-2 border-indigo-300 relative overflow-hidden transition-colors duration-300">
+                    <!-- 중앙 용액 방울 표시 색상 변경: bg-gray-400 -> bg-indigo-400 --><div id="drop-point" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-400 rounded-full z-10 opacity-50"></div>
+                    
+                    <!-- 색 변화 애니메이션 영역 --><div id="color-change" class="absolute h-full top-0"></div>
+
+                    <!-- Ion Models (positioned by JS) --><div id="ion-model-1" class="absolute top-1/2 -translate-y-1/2 opacity-0 z-20"></div>
+                    <div id="ion-model-2" class="absolute top-1/2 -translate-y-1/2 opacity-0 z-20"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 결과 및 설명 (Explanation Area) --><div id="explanation-container" class="mt-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-3 text-center">시뮬레이션 결과</h3>
+            <!-- 배경색 변경: bg-blue-50 -> bg-yellow-50, border-blue-500 -> border-yellow-500 --><div id="explanation" class="bg-yellow-50 border-l-4 border-yellow-500 p-5 rounded-r-lg text-center text-gray-700 min-h-[80px] flex items-center justify-center">
+                <p class="text-lg">설정을 선택하고 '시뮬레이션 시작' 버튼을 누르세요.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 요소 가져오기
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const litmusPaper = document.getElementById('litmus-paper');
+        const colorChange = document.getElementById('color-change');
+        const explanation = document.getElementById('explanation');
+        const explanationContainer = document.getElementById('explanation').parentElement; // 설명 영역의 부모 (테두리 색 변경용)
+        const ionModel1 = document.getElementById('ion-model-1');
+        const ionModel2 = document.getElementById('ion-model-2');
+        const equationDisplay = document.getElementById('equation-display');
+
+        // 색상 정의 (Tailwind 색상과 일치)
+        const redColor = 'rgb(239, 68, 68)'; // tailwind-red-500
+        const blueColor = 'rgb(59, 130, 246)'; // tailwind-blue-500
+        
+        // 설명 영역 스타일 변경 함수
+        function setExplanationStyle(type) {
+            const el = document.getElementById('explanation');
+            // 기존 클래스 제거
+            el.classList.remove('bg-blue-50', 'border-blue-500', 'bg-red-50', 'border-red-500', 'bg-gray-50', 'border-gray-500', 'bg-yellow-50', 'border-yellow-500');
+            
+            // 새로운 클래스 추가
+            if (type === 'acid') {
+                el.classList.add('bg-red-50', 'border-red-500'); // 산성 결과는 붉은색 계열로 유지
+            } else if (type === 'base') {
+                el.classList.add('bg-blue-50', 'border-blue-500'); // 염기성 결과는 푸른색 계열로 유지
+            } else {
+                el.classList.add('bg-yellow-50', 'border-yellow-500'); // 기본은 노란색 계열
+            }
+        }
+
+        // 시뮬레이션 초기화 함수
+        function resetSimulation() {
+            const litmusType = document.querySelector('input[name="litmus"]:checked').value;
+            const solutionType = document.querySelector('input[name="solution"]:checked').value;
+            
+            // 1. 리트머스 종이 기본 색상 설정
+            litmusPaper.style.backgroundColor = (litmusType === 'red') ? redColor : blueColor;
+            
+            // 2. 애니메이션 오버레이(colorChange) 초기화
+            colorChange.style.transition = 'none'; // 진행 중인 애니메이션 즉시 중지
+            colorChange.style.width = '0';
+            colorChange.style.left = 'auto';
+    
+            colorChange.style.right = 'auto';
+            colorChange.style.backgroundColor = 'transparent';
+
+            // 2.5 이온 모델 초기화
+            ionModel1.style.transition = 'none';
+            ionModel2.style.transition = 'none';
+            ionModel1.innerHTML = '';
+            ionModel2.innerHTML = '';
+            // className을 재설정하여 ion-model 등 추가된 클래스 제거
+            ionModel1.className = 'absolute top-1/2 -translate-y-1/2 opacity-0 z-20';
+            ionModel2.className = 'absolute top-1/2 -translate-y-1/2 opacity-0 z-20';
+            // 중앙(50%)으로 위치 초기화
+            ionModel1.style.left = '50%';
+            ionModel1.style.right = 'auto';
+            ionModel1.style.transform = 'translate(-50%, -50%)';
+            ionModel2.style.left = '50%';
+            ionModel2.style.right = 'auto';
+            ionModel2.style.transform = 'translate(-50%, -50%)';
+            ionModel1.style.opacity = '0';
+            ionModel2.style.opacity = '0';
+
+
+            // 3. 설명란 초기화
+            explanation.innerHTML = '<p class="text-lg">설정을 선택하고 \'시뮬레이션 시작\' 버튼을 누르세요.</p>';
+            setExplanationStyle('default'); // 기본 노란색 계열로 설정
+            
+            // 4. 이온화 반응식 업데이트
+            if (solutionType === 'acid') {
+                equationDisplay.innerHTML = `<p class="text-xl font-mono text-gray-700">HCl &rarr; H+ + Cl-</p>`;
+            } else { // base
+                equationDisplay.innerHTML = `<p class="text-xl font-mono text-gray-700">NaOH &rarr; Na+ + OH-</p>`;
+            }
+
+            // 5. 버튼 활성화
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // 시뮬레이션 시작 함수
+        function startSimulation() {
+            // 1. 현재 선택 값 가져오기
+            const litmusType = document.querySelector('input[name="litmus"]:checked').value;
+            const solutionType = document.querySelector('input[name="solution"]:checked').value;
+
+            // 2. 시작 전 상태로 초기화
+            resetSimulation();
+            
+            // 3. 버튼 비활성화 (애니메이션 중 중복 클릭 방지)
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // 4. 로직 분기
+            let ion = '';
+            let ionCharge = '';
+            let pole = '';
+            let resultText = '';
+
+            // 이온 모델 정의
+            let cationText = '';
+            let anionText = '';
+            if (solutionType === 'acid') {
+                cationText = 'H<sup>+</sup>'; // 'H<sup>+</sup>'에서 변경
+                anionText = 'Cl<sup>-</sup>'; // 'Cl<sup>-</sup>'에서 변경
+            } else {
+                cationText = 'Na<sup>+</sup>'; // 'Na<sup>+</sup>'에서 변경
+                anionText = 'OH<sup>-</sup>'; // 'OH<sup>-</sup>'에서 변경
+            }
+
+            // 이온 모델 스타일 및 내용 설정
+            // Model 1 = Cation (양이온)
+            ionModel1.innerHTML = cationText;
+            ionModel1.classList.add('ion-model', 'ion-cation');
+            
+            // Model 2 = Anion (음이온)
+            ionModel2.innerHTML = anionText;
+            ionModel2.classList.add('ion-model', 'ion-anion');
+
+            // 5. 이온 애니메이션 시작 (모든 경우 공통)
+            // H+, Na+ 등 양이온은 (-)극 (left: 0%)으로 이동
+            // OH-, Cl- 등 음이온은 (+)극 (left: 100%)으로 이동
+            setTimeout(() => {
+                // 양이온 (Model 1)
+                ionModel1.style.opacity = '1';
+                ionModel1.style.transition = 'left 8s ease-out, opacity 0.5s ease-in-out, transform 8s ease-out';
+                ionModel1.style.left = '0%'; // 50% -> 0%
+                ionModel1.style.transform = 'translate(0%, -50%)'; // 중앙 정렬 -> 좌측 정렬
+
+                // 음이온 (Model 2)
+                ionModel2.style.opacity = '1';
+                ionModel2.style.transition = 'left 8s ease-out, opacity 0.5s ease-in-out, transform 8s ease-out';
+                ionModel2.style.left = '100%'; // 50% -> 100%
+                ionModel2.style.transform = 'translate(-100%, -50%)'; // 중앙 정렬 -> 우측 정렬
+            }, 100);
+
+
+            // 6. 색상 변화 로직 (기존 4번 항목)
+            if (litmusType === 'red' && solutionType === 'acid') {
+                // [붉은 종이 + 산]
+                // H+ 이온이 (-)극으로 이동. 붉은색 -> 붉은색 (변화 없음)
+                ion = 'H+';
+                ionCharge = '양이온';
+                pole = '(-)극';
+                resultText = `붉은색 리트머스 종이는 산성 용액에 의해 색이 변하지 않습니다. (변화 없음)`;
+                setExplanationStyle('acid');
+
+            } else if (litmusType === 'red' && solutionType === 'base') {
+                // [붉은 종이 + 염기]
+                // OH- 이온이 (+)극으로 이동. 붉은색 -> 푸른색
+                ion = 'OH-';
+                ionCharge = '음이온';
+                pole = '(+)극';
+                resultText = `붉은색 리트머스 종이가 <span class="font-bold text-blue-600">푸른색</span>으로 변합니다.`;
+                setExplanationStyle('base');
+
+                // 애니메이션 설정: 중앙(50%)에서 오른쪽(+)으로
+                colorChange.style.backgroundColor = blueColor;
+                colorChange.style.left = '50%';
+                colorChange.style.transition = 'width 8s ease-out'; 
+                setTimeout(() => {
+                    colorChange.style.width = '50%';
+                }, 100); 
+
+            } else if (litmusType === 'blue' && solutionType === 'acid') {
+                // [푸른 종이 + 산]
+                // H+ 이온이 (-)극으로 이동. 푸른색 -> 붉은색
+                ion = 'H+';
+                ionCharge = '양이온';
+                pole = '(-)극';
+                resultText = `푸른색 리트머스 종이가 <span class="font-bold text-red-600">붉은색</span>으로 변합니다.`;
+                setExplanationStyle('acid');
+
+                // 애니메이션 설정: 중앙(50%)에서 왼쪽(-)으로
+                colorChange.style.backgroundColor = redColor;
+                colorChange.style.right = '50%';
+                colorChange.style.transition = 'width 8s ease-out'; 
+                setTimeout(() => {
+                    colorChange.style.width = '50%';
+                }, 100);
+
+            } else if (litmusType === 'blue' && solutionType === 'base') {
+                // [푸른 종이 + 염기]
+                // OH- 이온이 (+)극으로 이동. 푸른색 -> 푸른색 (변화 없음)
+                ion = 'OH-';
+                ionCharge = '음이온';
+                pole = '(+)극';
+                resultText = `푸른색 리트머스 종이는 염기성 용액에 의해 색이 변하지 않습니다. (변화 없음)`;
+                setExplanationStyle('base');
+            }
+
+            // 7. 설명 업데이트 (기존 5번 항목)
+            explanation.innerHTML = `
+                <p class="text-lg">
+                    <span class="font-bold">${ion} (${ionCharge})</span>이(가) 
+                    <span class="font-bold">${pole}</span>(으)로 이동하여, ${resultText}
+                </p>
+            `;
+            
+            // 8. 애니메이션 완료 후 버튼 다시 활성화 (기존 6번 항목)
+            setTimeout(() => {
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 8100); // 8초 + 0.1초 버퍼
+        }
+
+        // 이벤트 리스너 연결
+        startBtn.addEventListener('click', startSimulation);
+        resetBtn.addEventListener('click', resetSimulation);
+        
+        // 라디오 버튼 변경 시 즉시 리트머스 종이 색상 변경 (초기화)
+        document.querySelectorAll('input[name="litmus"]').forEach(radio => {
+            radio.addEventListener('change', resetSimulation);
+        });
+        document.querySelectorAll('input[name="solution"]').forEach(radio => {
+            radio.addEventListener('change', resetSimulation);
+        });
+
+        // 페이지 로드 시 초기 상태 설정
+        resetSimulation();
+    </script>
+</body>
+</html>
