@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우주 탈출 속도 시뮬레이터</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        canvas {
+            /* 우주 배경: 별이 반짝이는 효과를 위한 SVG 배경 */
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="10" y="10" font-size="10" fill="white">.</text><text x="80" y="30" font-size="5" fill="white">.</text><text x="50" y="70" font-size="8" fill="white">.</text><text x="20" y="90" font-size="5" fill="white">.</text><text x="90" y="95" font-size="5" fill="white">.</text></svg>');
+            background-color: #0c0a18;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            cursor: crosshair;
+        }
+        /* 슬라이더 디자인 커스텀 */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4F46E5;
+            cursor: pointer;
+            border-radius: 50%;
+            margin-top: -6px;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4F46E5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-indigo-400">우주 탈출 속도 시뮬레이터</h1>
+            <p class="text-gray-400 mt-2">지구 궤도를 관찰하고 중력을 이겨내어 우주로 나아가 보세요.</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <!-- 시뮬레이션 캔버스 영역 (왼쪽) -->
+            <div class="md:col-span-3 bg-gray-800 rounded-lg shadow-2xl overflow-hidden relative">
+                <canvas id="simulationCanvas"></canvas>
+                <!-- 줌 안내 문구 -->
+                <div class="absolute bottom-4 left-4 bg-black/50 px-3 py-1 rounded text-xs text-gray-300">
+                    마우스 휠을 사용하여 확대/축소 하세요.
+                </div>
+            </div>
+
+            <!-- 제어 및 정보 패널 (오른쪽) -->
+            <div class="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-2xl flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">정보 및 제어</h2>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-300">제1우주속도 (원궤도)</label>
+                        <p id="orbitalVelocity" class="text-2xl font-bold text-blue-400">7.9 km/s</p>
+                        <p class="text-xs text-gray-500 mt-1">이 고도에서 안정적으로 원궤도를 유지하는 최소 속도입니다.</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-300">제2우주속도 (탈출 속도)</label>
+                        <p id="escapeVelocity" class="text-2xl font-bold text-green-400">11.1 km/s</p>
+                        <p class="text-xs text-gray-500 mt-1">지구의 중력을 완전히 이겨내고 탈출하는 최소 속도입니다.</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <label for="velocitySlider" class="block text-sm font-medium text-gray-300 mb-2">
+                            우주선 초기 속도 설정: <span id="velocityValue" class="font-bold text-indigo-400">7.8 km/s</span>
+                        </label>
+                        <input id="velocitySlider" type="range" min="1" max="15" value="7.8" step="0.1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <div class="mb-4">
+                         <label class="block text-sm font-medium text-gray-300">현재 상태</label>
+                         <p id="status" class="text-lg font-semibold text-yellow-400 p-2 bg-gray-700/50 rounded-md text-center">대기 중</p>
+                    </div>
+                </div>
+
+                <button id="launchButton" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg shadow-lg">
+                    🚀 발사 시작
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 중복 실행 방지를 위한 가드 변수
+        if (!window.finalSimulationInitialized) {
+            window.finalSimulationInitialized = true;
+
+            // --- 물리 및 환경 설정 ---
+            const G = 6.67430e-11; // 중력 상수
+            const M = 5.972e24;    // 지구 질량
+            const R_EARTH_REAL = 6371e3; // 실제 지구 반지름 (m)
+            const START_ALTITUDE = 1000e3; // 초기 발사 고도 (1000km)
+            const START_RADIUS = R_EARTH_REAL + START_ALTITUDE;
+            
+            // 고도에 따른 이론적 속도 계산
+            const ORBITAL_VELOCITY_REAL = Math.sqrt(G * M / START_RADIUS); 
+            const ESCAPE_VELOCITY_REAL = Math.sqrt(2 * G * M / START_RADIUS);
+
+            const canvas = document.getElementById('simulationCanvas');
+            const ctx = canvas.getContext('2d');
+            const velocitySlider = document.getElementById('velocitySlider');
+            const velocityValue = document.getElementById('velocityValue');
+            const launchButton = document.getElementById('launchButton');
+            const statusEl = document.getElementById('status');
+
+            let animationFrameId;
+            let spaceship = {
+                pos: { x: 0, y: START_RADIUS },
+                vel: { x: 0, y: 0 },
+                initialVel: 0,
+                isFlying: false,
+                trajectory: [] // 이동 궤적 저장
+            };
+
+            // --- 줌 및 스케일링 설정 ---
+            let scale; 
+            let viewDistance = R_EARTH_REAL * 2.5; // 화면에 보이는 실제 거리의 범위
+
+            function setCanvasDimensions() {
+                const container = canvas.parentElement;
+                const size = container.clientWidth;
+                canvas.width = size;
+                canvas.height = size;
+                updateScale();
+                draw();
+            }
+
+            function updateScale() {
+                // 화면 중심으로부터의 거리를 캔버스 픽셀로 변환하기 위한 배율
+                scale = (canvas.width / 2) / viewDistance; 
+            }
+
+            // --- 휠 이벤트: 줌인/줌아웃 구현 ---
+            function handleZoom(event) {
+                event.preventDefault();
+                const zoomIntensity = 0.1;
+                const wheel = event.deltaY < 0 ? 1 : -1;
+                const zoomFactor = Math.exp(wheel * zoomIntensity);
+
+                viewDistance /= zoomFactor;
+
+                // 줌 한계 설정 (지구가 너무 작아지거나 너무 커지지 않게)
+                const minDistance = R_EARTH_REAL * 1.2;
+                const maxDistance = R_EARTH_REAL * 50;
+                if (viewDistance < minDistance) viewDistance = minDistance;
+                if (viewDistance > maxDistance) viewDistance = maxDistance;
+
+                updateScale();
+                draw();
+            }
+
+            function init() {
+                // 정보 텍스트 설정
+                document.getElementById('orbitalVelocity').textContent = `${(ORBITAL_VELOCITY_REAL / 1000).toFixed(2)} km/s`;
+                document.getElementById('escapeVelocity').textContent = `${(ESCAPE_VELOCITY_REAL / 1000).toFixed(2)} km/s`;
+                
+                // 초기값 설정
+                velocitySlider.value = (ORBITAL_VELOCITY_REAL / 1000).toFixed(1);
+                velocityValue.textContent = `${parseFloat(velocitySlider.value).toFixed(1)} km/s`;
+
+                // 이벤트 리스너 등록
+                velocitySlider.addEventListener('input', () => {
+                    velocityValue.textContent = `${parseFloat(velocitySlider.value).toFixed(1)} km/s`;
+                });
+                launchButton.addEventListener('click', launch);
+                window.addEventListener('resize', setCanvasDimensions);
+                canvas.addEventListener('wheel', handleZoom);
+                
+                setCanvasDimensions();
+            }
+
+            function launch() {
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                
+                const initialVelValue = parseFloat(velocitySlider.value) * 1000;
+                spaceship = {
+                    pos: { x: 0, y: START_RADIUS },
+                    vel: { x: initialVelValue, y: 0 }, // 수평 방향 발사
+                    initialVel: initialVelValue,
+                    isFlying: true,
+                    trajectory: [{ x: 0, y: START_RADIUS }]
+                };
+                
+                statusEl.textContent = '비행 중...';
+                statusEl.className = 'text-lg font-semibold text-blue-400 p-2 bg-gray-700/50 rounded-md text-center';
+                launchButton.textContent = '🚀 재발사';
+                
+                frameCount = 0;
+                animate();
+            }
+
+            // 월드 좌표를 캔버스 화면 좌표로 변환
+            function toScreenCoords(worldPos) {
+                return {
+                    x: canvas.width / 2 + worldPos.x * scale,
+                    y: canvas.height / 2 - worldPos.y * scale
+                };
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawEarth();
+                drawTrajectory();
+                drawSpaceship();
+            }
+            
+            function drawEarth() {
+                const screenPos = toScreenCoords({x: 0, y: 0});
+                const earthRadiusOnScreen = R_EARTH_REAL * scale;
+                
+                // 대기 광채 효과
+                const gradient = ctx.createRadialGradient(screenPos.x, screenPos.y, earthRadiusOnScreen, screenPos.x, screenPos.y, earthRadiusOnScreen + 20);
+                gradient.addColorStop(0, 'rgba(74, 144, 226, 0.4)');
+                gradient.addColorStop(1, 'rgba(74, 144, 226, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 지구 본체 (바다)
+                ctx.fillStyle = '#4A90E2';
+                ctx.beginPath();
+                ctx.arc(screenPos.x, screenPos.y, earthRadiusOnScreen, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // 대륙 묘사 (Example: 초록 대륙)
+                ctx.fillStyle = '#2ECC71';
+                ctx.beginPath();
+                ctx.ellipse(screenPos.x - earthRadiusOnScreen * 0.3, screenPos.y - earthRadiusOnScreen * 0.2, earthRadiusOnScreen*0.4, earthRadiusOnScreen*0.3, Math.PI/4, 0, 2*Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(screenPos.x + earthRadiusOnScreen * 0.4, screenPos.y + earthRadiusOnScreen * 0.3, earthRadiusOnScreen*0.2, earthRadiusOnScreen*0.4, -Math.PI/6, 0, 2*Math.PI);
+                ctx.fill();
+            }
+
+            function drawTrajectory() {
+                if (spaceship.trajectory.length < 2) return;
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 6]); // 점선 설정
+                ctx.beginPath();
+                
+                const startPoint = toScreenCoords(spaceship.trajectory[0]);
+                ctx.moveTo(startPoint.x, startPoint.y);
+                
+                for (let i = 1; i < spaceship.trajectory.length; i++) {
+                    const point = toScreenCoords(spaceship.trajectory[i]);
+                    ctx.lineTo(point.x, point.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); // 대시 초기화
+            }
+
+            function drawSpaceship() {
+                const screenPos = toScreenCoords(spaceship.pos);
+                ctx.save();
+                ctx.translate(screenPos.x, screenPos.y);
+                
+                // 우주선의 속도 방향에 맞춰 회전
+                const angle = Math.atan2(spaceship.vel.y, spaceship.vel.x);
+                ctx.rotate(angle + Math.PI / 2);
+
+                const w = 12; 
+                const h = 25; 
+
+                // 1. 화염 (비행 중일 때만)
+                if (spaceship.isFlying) {
+                    ctx.fillStyle = `rgba(255, ${150 + Math.random() * 105}, 0, 0.9)`;
+                    ctx.beginPath();
+                    ctx.moveTo(-w/4, h/2); ctx.lineTo(w/4, h/2);
+                    ctx.lineTo(0, h/2 + 10 + Math.random() * 10);
+                    ctx.closePath(); ctx.fill();
+                }
+
+                // 2. 빨간색 핀 (Example)
+                ctx.fillStyle = '#E63946';
+                ctx.beginPath(); // 왼쪽 핀
+                ctx.moveTo(-w/2, h*0.2); ctx.lineTo(-w, h/2); ctx.lineTo(-w/2, h/2); ctx.closePath(); ctx.fill();
+                ctx.beginPath(); // 오른쪽 핀
+                ctx.moveTo(w/2, h*0.2); ctx.lineTo(w, h/2); ctx.lineTo(w/2, h/2); ctx.closePath(); ctx.fill();
+
+                // 3. 하얀색 본체 (Example)
+                ctx.fillStyle = '#F1FAEE';
+                ctx.beginPath();
+                ctx.moveTo(0, -h/2); // 노즈콘
+                ctx.lineTo(w/2, h*0.1); ctx.lineTo(w/2, h/2); ctx.lineTo(-w/2, h/2); ctx.lineTo(-w/2, h*0.1);
+                ctx.closePath(); ctx.fill();
+
+                ctx.restore();
+            }
+
+            let frameCount = 0;
+            function animate() {
+                const dt = 1/60 * 1000; // 시뮬레이션 시간 배율
+
+                const r_vec = spaceship.pos;
+                const r_mag = Math.sqrt(r_vec.x * r_vec.x + r_vec.y * r_vec.y);
+                
+                // 만유인력 법칙 적용: a = -G * M / r^2 (방향은 중심)
+                const acceleration_mag = -G * M / (r_mag * r_mag);
+                const acc_vec = {
+                    x: acceleration_mag * (r_vec.x / r_mag),
+                    y: acceleration_mag * (r_vec.y / r_mag)
+                };
+
+                // 속도 및 위치 업데이트
+                spaceship.vel.x += acc_vec.x * dt;
+                spaceship.vel.y += acc_vec.y * dt;
+                spaceship.pos.x += spaceship.vel.x * dt;
+                spaceship.pos.y += spaceship.vel.y * dt;
+                
+                // 궤적 기록 (성능을 위해 5프레임마다 저장)
+                if(frameCount % 5 === 0) {
+                     spaceship.trajectory.push({ ...spaceship.pos });
+                     // 너무 긴 궤적은 메모리를 위해 제한할 수 있지만 학습용이므로 유지
+                }
+                frameCount++;
+
+                // 상태 판정
+                if (r_mag < R_EARTH_REAL) { // 충돌
+                    spaceship.isFlying = false;
+                    statusEl.textContent = '지구와 충돌';
+                    statusEl.className = 'text-lg font-semibold text-red-500 p-2 bg-gray-700/50 rounded-md text-center';
+                    launchButton.textContent = '🚀 발사';
+                } else if (spaceship.initialVel >= ESCAPE_VELOCITY_REAL && r_mag > viewDistance * 1.5) { // 탈출
+                    spaceship.isFlying = false;
+                    statusEl.textContent = '탈출 성공!';
+                    statusEl.className = 'text-lg font-semibold text-green-400 p-2 bg-gray-700/50 rounded-md text-center';
+                    launchButton.textContent = '🚀 발사';
+                }
+
+                draw();
+
+                if (spaceship.isFlying) {
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    draw();
+                }
+            }
+            
+            init();
+        }
+    </script>
+</body>
+</html>
