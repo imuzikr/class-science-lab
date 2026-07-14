@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>빗면 운동 학습 시뮬레이터</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .slider-label {
+            @apply w-48 text-sm text-gray-500 dark:text-gray-400;
+        }
+        .slider-value {
+            @apply w-20 text-right font-semibold text-gray-800 dark:text-gray-200;
+        }
+        .result-label {
+            @apply text-gray-600 dark:text-gray-400;
+        }
+        .result-value {
+            @apply font-bold text-indigo-600 dark:text-indigo-400;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+        <header class="p-6 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">빗면 운동 학습 시뮬레이터 ⚛️</h1>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">슬라이더를 조절하여 빗면 위 물체의 운동을 탐구해보세요.</p>
+        </header>
+
+        <main class="grid md:grid-cols-2 gap-8 p-6">
+            <!-- 시뮬레이션 캔버스 -->
+            <div class="w-full min-h-[480px] bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center relative overflow-hidden">
+                <canvas id="simulationCanvas"></canvas>
+            </div>
+
+            <!-- 컨트롤 패널 -->
+            <div class="flex flex-col space-y-6">
+                <!-- 슬라이더 컨트롤 -->
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <label for="angle" class="slider-label">빗면 각도 (θ)</label>
+                        <input type="range" id="angle" min="0" max="60" value="30" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+                        <span id="angleValue" class="slider-value">30.0 °</span>
+                    </div>
+                    <div class="flex items-center">
+                        <label for="mass" class="slider-label">물체 질량 (m)</label>
+                        <input type="range" id="mass" min="1" max="10" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+                        <span id="massValue" class="slider-value">5.0 kg</span>
+                    </div>
+                    <div class="flex items-center">
+                        <label for="friction" class="slider-label">정지 마찰 계수 (μₛ)</label>
+                        <input type="range" id="friction" min="0" max="1" value="0.2" step="0.01" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+                        <span id="frictionValue" class="slider-value">0.20</span>
+                    </div>
+                </div>
+
+                <!-- 계산 결과 -->
+                <div class="p-4 bg-gray-100 dark:bg-gray-700/50 rounded-lg space-y-2">
+                    <h3 class="font-semibold mb-3 text-lg text-gray-800 dark:text-gray-100">실시간 계산 결과</h3>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <span class="result-label">중력 (mg)</span>
+                        <span id="forceGravity" class="result-value">49.00 N</span>
+
+                        <span class="result-label">수직 항력 (N)</span>
+                        <span id="forceNormal" class="result-value">42.44 N</span>
+
+                        <span class="result-label">빗면 방향 힘 (mg sinθ)</span>
+                        <span id="forceParallel" class="result-value">24.50 N</span>
+
+                        <span class="result-label">최대 정지 마찰력 (fₛ,max)</span>
+                        <span id="forceFrictionMax" class="result-value">0.00 N</span>
+
+                        <span class="result-label">작용하는 마찰력 (fₛ)</span>
+                        <span id="forceFriction" class="result-value">8.49 N</span>
+                        
+                        <span class="result-label col-span-2 border-t pt-2 border-gray-300 dark:border-gray-600 mt-1"></span>
+
+                        <span class="result-label font-bold text-base">알짜힘 (F_net)</span>
+                        <span id="forceNet" class="result-value font-extrabold text-base">16.01 N</span>
+
+                        <span class="result-label font-bold text-base">가속도 (a)</span>
+                        <span id="acceleration" class="result-value font-extrabold text-base">3.20 m/s²</span>
+                    </div>
+                </div>
+
+                <!-- 액션 버튼 -->
+                <div class="pt-2">
+                     <button id="startButton" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-800 transition-all duration-300 ease-in-out">
+                         시뮬레이션 시작
+                     </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // DOM 요소 가져오기
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const angleSlider = document.getElementById('angle');
+        const massSlider = document.getElementById('mass');
+        const frictionSlider = document.getElementById('friction');
+        const startButton = document.getElementById('startButton');
+
+        const angleValue = document.getElementById('angleValue');
+        const massValue = document.getElementById('massValue');
+        const frictionValue = document.getElementById('frictionValue');
+
+        const forceGravityEl = document.getElementById('forceGravity');
+        const forceNormalEl = document.getElementById('forceNormal');
+        const forceParallelEl = document.getElementById('forceParallel');
+        const forceFrictionEl = document.getElementById('forceFriction');
+        const forceFrictionMaxEl = document.getElementById('forceFrictionMax');
+        const forceNetEl = document.getElementById('forceNet');
+        const accelerationEl = document.getElementById('acceleration');
+        
+        // 물리 상수
+        const g = 9.8;
+
+        // 시뮬레이션 상태 변수
+        let state = {
+            angle: 30,
+            mass: 5,
+            frictionCoeff: 0.2,
+            acceleration: 0,
+            isRunning: false,
+            block: {
+                width: 30,
+                height: 30,
+                positionOnRamp: 0, // 빗면 위에서의 상대적 위치 (0: top, 1: bottom)
+                centerX: 0,
+                centerY: 0,
+            },
+            ramp: {
+                startX: 0,
+                startY: 0,
+                endX: 0,
+                endY: 0,
+                length: 0
+            },
+            animationFrameId: null,
+            velocity: 0,
+            message: null,
+        };
+
+        // 캔버스 크기 조절
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            canvas.style.width = `${container.clientWidth}px`;
+            canvas.style.height = `${container.clientHeight}px`;
+            ctx.scale(dpr, dpr);
+            draw(); // 리사이즈 후 다시 그리기
+        }
+        
+        // 물리량 계산 및 UI 업데이트
+        function calculate() {
+            const angleRad = state.angle * Math.PI / 180;
+            const mass = state.mass;
+            const frictionCoeff = state.frictionCoeff;
+
+            const forceGravity = mass * g;
+            const forceNormal = forceGravity * Math.cos(angleRad);
+            const forceParallel = forceGravity * Math.sin(angleRad);
+            const maxStaticFriction = frictionCoeff * forceNormal;
+
+            let actualFriction;
+            let forceNet;
+
+            // 물체가 정지해 있을 조건: 빗면 방향 힘 <= 최대 정지 마찰력
+            if (forceParallel <= maxStaticFriction) {
+                // 실제 작용하는 정지 마찰력은 빗면 방향 힘과 크기가 같음
+                actualFriction = forceParallel;
+                forceNet = 0; // 알짜힘은 0
+            } else {
+                // 물체가 움직이는 경우: 마찰력은 최대 정지 마찰력 (운동 마찰 계수가 없으므로 단순화)
+                actualFriction = maxStaticFriction;
+                forceNet = forceParallel - maxStaticFriction;
+            }
+            
+            state.acceleration = (mass > 0) ? forceNet / mass : 0;
+
+            // UI 업데이트
+            angleValue.textContent = `${parseFloat(state.angle).toFixed(1)} °`;
+            massValue.textContent = `${parseFloat(state.mass).toFixed(1)} kg`;
+            frictionValue.textContent = `${parseFloat(state.frictionCoeff).toFixed(2)}`;
+
+            forceGravityEl.textContent = `${forceGravity.toFixed(2)} N`;
+            forceNormalEl.textContent = `${forceNormal.toFixed(2)} N`;
+            forceParallelEl.textContent = `${forceParallel.toFixed(2)} N`;
+            forceFrictionMaxEl.textContent = `${maxStaticFriction.toFixed(2)} N`;
+            forceFrictionEl.textContent = `${actualFriction.toFixed(2)} N`;
+            forceNetEl.textContent = `${forceNet.toFixed(2)} N`;
+            accelerationEl.textContent = `${state.acceleration.toFixed(2)} m/s²`;
+        }
+        
+        // 빗면 그리기
+        function drawRamp() {
+            const { width, height } = canvas.parentElement.getBoundingClientRect();
+            const margin = 40;
+            const currentAngleRad = state.angle * Math.PI / 180;
+            const maxAngleRad = 60 * Math.PI / 180;
+
+            const maxAllowedWidth = width - 2 * margin;
+            const maxAllowedHeight = height - 2 * margin;
+
+            let rampBase = maxAllowedHeight / Math.tan(maxAngleRad);
+            if (rampBase > maxAllowedWidth) rampBase = maxAllowedWidth;
+
+            const rampHeight = rampBase * Math.tan(currentAngleRad);
+            const startX = (width - rampBase) / 2;
+            
+            state.ramp.startX = startX;
+            state.ramp.startY = height - margin - rampHeight; 
+            state.ramp.endX = startX + rampBase;
+            state.ramp.endY = height - margin; 
+            state.ramp.length = Math.sqrt(rampBase**2 + rampHeight**2);
+
+            // 빗면 삼각형
+            const gradient = ctx.createLinearGradient(state.ramp.startX, state.ramp.startY, state.ramp.endX, state.ramp.endY);
+            gradient.addColorStop(0, '#a5b4fc');
+            gradient.addColorStop(1, '#818cf8');
+            
+            ctx.beginPath();
+            ctx.moveTo(state.ramp.startX, state.ramp.startY);
+            ctx.lineTo(state.ramp.endX, state.ramp.endY);
+            ctx.lineTo(state.ramp.startX, state.ramp.endY);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 빗면 라인
+            ctx.beginPath();
+            ctx.moveTo(state.ramp.startX, state.ramp.startY);
+            ctx.lineTo(state.ramp.endX, state.ramp.endY);
+            ctx.strokeStyle = '#6366f1';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // 바닥선
+            ctx.beginPath();
+            ctx.moveTo(0, height - margin);
+            ctx.lineTo(width, height - margin);
+            ctx.strokeStyle = '#9ca3af';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // 각도(θ) 표시
+            if (state.angle > 1) {
+                ctx.save();
+                ctx.strokeStyle = '#434a54';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                // arcRadius가 음수가 되는 것을 방지하기 위해 Math.max(0, ...) 추가
+                const arcRadius = Math.max(0, Math.min(30, rampBase * 0.2)); 
+                if(arcRadius > 0) { // 반지름이 0보다 클 때만 호를 그림
+                    ctx.arc(state.ramp.endX, state.ramp.endY, arcRadius, Math.PI, Math.PI + currentAngleRad, false);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#434a54';
+                    ctx.font = 'italic 16px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const textRadius = arcRadius + 15;
+                    const thetaX = state.ramp.endX - textRadius * Math.cos(currentAngleRad / 2);
+                    const thetaY = state.ramp.endY - textRadius * Math.sin(currentAngleRad / 2);
+                    ctx.fillText(`${state.angle.toFixed(1)}°`, thetaX, thetaY);
+                }
+                ctx.restore();
+            }
+        }
+
+        // 물체 그리기
+        function drawBlock() {
+            const angleRad = state.angle * Math.PI / 180;
+            const p = state.block.positionOnRamp;
+            
+            const rampSurfaceX = state.ramp.startX + (state.ramp.length * p) * Math.cos(angleRad);
+            const rampSurfaceY = state.ramp.startY + (state.ramp.length * p) * Math.sin(angleRad);
+            
+            state.block.centerX = rampSurfaceX + (state.block.height / 2) * Math.sin(angleRad);
+            state.block.centerY = rampSurfaceY - (state.block.height / 2) * Math.cos(angleRad);
+
+            ctx.save();
+            ctx.translate(state.block.centerX, state.block.centerY);
+            ctx.rotate(angleRad);
+            
+            const gradient = ctx.createLinearGradient(-state.block.width / 2, -state.block.height / 2, state.block.width / 2, state.block.height / 2);
+            gradient.addColorStop(0, '#fb923c');
+            gradient.addColorStop(1, '#ea580c');
+            ctx.fillStyle = gradient;
+
+            ctx.fillRect(-state.block.width / 2, -state.block.height / 2, state.block.width, state.block.height);
+            ctx.strokeStyle = '#9a3412';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-state.block.width / 2, -state.block.height / 2, state.block.width, state.block.height);
+            ctx.restore();
+        }
+        
+        // 힘 화살표 그리기
+        function drawForces() {
+            const angleRad = state.angle * Math.PI / 180;
+            const forceScale = 1.5;
+            const blockCenterX = state.block.centerX;
+            const blockCenterY = state.block.centerY;
+            
+            const forceGravity = state.mass * g;
+            const forceNormal = forceGravity * Math.cos(angleRad);
+            const forceParallel = forceGravity * Math.sin(angleRad);
+            const maxStaticFriction = state.frictionCoeff * forceNormal;
+            
+            // 실제 작용하는 정지 마찰력 계산
+            const actualFriction = Math.min(forceParallel, maxStaticFriction);
+
+            const sin = Math.sin(angleRad);
+            const cos = Math.cos(angleRad);
+
+            // 중력 (mg) - 빨간색
+            const mg_tipX = blockCenterX;
+            const mg_tipY = blockCenterY + forceGravity * forceScale;
+            drawArrow(blockCenterX, blockCenterY, mg_tipX, mg_tipY, '#dc2626', 'mg');
+            
+            // --- 벡터 분해 로직 수정 ---
+
+            // 빗면 수평 성분 (mg sinθ) - 파란색
+            const mgSinTheta_vecX = (forceGravity * sin) * cos * forceScale;
+            const mgSinTheta_vecY = (forceGravity * sin) * sin * forceScale;
+            const mgSinTheta_tipX = blockCenterX + mgSinTheta_vecX;
+            const mgSinTheta_tipY = blockCenterY + mgSinTheta_vecY;
+            drawArrow(blockCenterX, blockCenterY, mgSinTheta_tipX, mgSinTheta_tipY, '#2563eb', 'mg sin\u03B8');
+
+            // 빗면 수직 성분 (mg cosθ) - 파란색
+            const mgCosTheta_vecX = -(forceGravity * cos) * sin * forceScale;
+            const mgCosTheta_vecY = (forceGravity * cos) * cos * forceScale;
+            const mgCosTheta_tipX = blockCenterX + mgCosTheta_vecX;
+            const mgCosTheta_tipY = blockCenterY + mgCosTheta_vecY;
+            drawArrow(blockCenterX, blockCenterY, mgCosTheta_tipX, mgCosTheta_tipY, '#2563eb', 'mg cos\u03B8');
+            
+            // 중력 분해 점선 (이제 정확한 직사각형을 이룹니다)
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.moveTo(mgCosTheta_tipX, mgCosTheta_tipY);
+            ctx.lineTo(mg_tipX, mg_tipY);
+            ctx.moveTo(mgSinTheta_tipX, mgSinTheta_tipY);
+            ctx.lineTo(mg_tipX, mg_tipY);
+            ctx.stroke();
+            ctx.restore();
+
+            // 수직 항력 (N) - 검은색 (수정된 mg cosθ의 반대 방향)
+            const n_tipX = blockCenterX - mgCosTheta_vecX;
+            const n_tipY = blockCenterY - mgCosTheta_vecY;
+            drawArrow(blockCenterX, blockCenterY, n_tipX, n_tipY, '#000000', 'N = mg cos\u03B8');
+
+            // 마찰력 (f) - 빨간색 (빗면 위쪽 방향)
+            if (actualFriction > 0.1) {
+                const friction_vecX = -actualFriction * cos * forceScale;
+                const friction_vecY = -actualFriction * sin * forceScale;
+                const f_tipX = blockCenterX + friction_vecX;
+                const f_tipY = blockCenterY + friction_vecY;
+                drawArrow(blockCenterX, blockCenterY, f_tipX, f_tipY, '#dc2626', 'f\u209B');
+            }
+        }
+        
+        // 화살표 그리는 헬퍼 함수
+        function drawArrow(fromX, fromY, toX, toY, color, label) {
+            const headlen = 10;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+
+            // Arrow shaft
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            // Arrow head
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            if (!label) {
+                ctx.restore();
+                return;
+            }
+            
+            ctx.font = 'bold 14px Inter';
+            ctx.textBaseline = 'middle';
+            
+            let textX, textY;
+            
+            if (label.includes('f\u209B')) { // Check for the subscript 's' to identify the friction label
+                // 마찰력 라벨을 화살표 머리 왼쪽에 배치
+                const perpAngle = angle - Math.PI / 2; // 화살표 방향에 수직인 각도 (왼쪽)
+                const labelOffset = 15; // 화살표 머리로부터의 거리
+                textX = toX + labelOffset * Math.cos(perpAngle);
+                textY = toY + labelOffset * Math.sin(perpAngle);
+                ctx.textAlign = 'right'; // 텍스트 기준점을 오른쪽 끝으로 설정
+            } else {
+                // 다른 라벨들은 화살표 끝 바깥쪽에 표시
+                const labelOffset = 20;
+                textX = toX + labelOffset * Math.cos(angle);
+                textY = toY + labelOffset * Math.sin(angle);
+                ctx.textAlign = 'center'; // 텍스트 기준점을 중앙으로 설정
+            }
+
+            const textMetrics = ctx.measureText(label);
+            const textWidth = textMetrics.width;
+            const textHeight = 16;
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            
+            // textAlign 값에 따라 배경 사각형 위치 조정
+            if (ctx.textAlign === 'right') {
+                ctx.fillRect(textX - textWidth - 2, textY - textHeight / 2, textWidth + 4, textHeight);
+            } else { // 'center'
+                ctx.fillRect(textX - textWidth / 2 - 2, textY - textHeight / 2, textWidth + 4, textHeight);
+            }
+            
+            ctx.fillStyle = color;
+            ctx.fillText(label, textX, textY);
+            ctx.restore();
+        }
+
+        function drawMessage() {
+            if (!state.message) return;
+            const { width, height } = canvas.parentElement.getBoundingClientRect();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.font = '16px Inter';
+            ctx.fillText(state.message, width / 2, height / 2);
+        }
+
+        // 전체 그리기 함수
+        function draw() {
+            const { width, height } = canvas.parentElement.getBoundingClientRect();
+            ctx.clearRect(0, 0, width, height);
+            drawRamp();
+            drawBlock();
+            if (!state.isRunning) { // 시뮬레이션이 실행 중이 아닐 때만 힘 벡터를 표시
+                drawForces();
+            }
+            drawMessage();
+        }
+
+        let lastTime = 0;
+        // 애니메이션 루프
+        function animate(timestamp) {
+            if (!state.isRunning) return;
+            
+            if (lastTime === 0) lastTime = timestamp;
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // 물리 공식: v = v₀ + at, s = v₀t + ½at²
+            const distanceMoved = (state.velocity * deltaTime + 0.5 * state.acceleration * deltaTime * deltaTime) * 50; // Scale for visibility
+            state.velocity += state.acceleration * deltaTime;
+            
+            state.block.positionOnRamp += distanceMoved / state.ramp.length;
+            
+            draw();
+
+            if (state.block.positionOnRamp >= 1) {
+                state.block.positionOnRamp = 1;
+                draw();
+                stopSimulation();
+            } else {
+                state.animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        // 시뮬레이션 리셋
+        function resetSimulation() {
+            state.block.positionOnRamp = 0.05;
+            state.velocity = 0;
+            lastTime = 0;
+            state.message = null;
+            draw();
+        }
+        
+        // 시뮬레이션 시작/중지
+        function startSimulation() {
+            if (state.isRunning) return;
+            state.isRunning = true;
+            state.message = null;
+            startButton.textContent = '리셋';
+            startButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            startButton.classList.add('bg-rose-600', 'hover:bg-rose-700');
+            setSlidersState(true);
+            
+            calculate();
+            if (state.acceleration <= 0.001) {
+                state.message = "알짜힘이 0에 가까워 물체가 움직이지 않습니다.";
+                draw();
+                setTimeout(() => {
+                    if(state.isRunning) {
+                        stopSimulation();
+                        resetSimulation();
+                    }
+                }, 2000);
+                return;
+            }
+            lastTime = 0;
+            state.animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function stopSimulation() {
+            if (!state.isRunning) return;
+            state.isRunning = false;
+            cancelAnimationFrame(state.animationFrameId);
+            startButton.textContent = '시뮬레이션 시작';
+            startButton.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+            startButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            setSlidersState(false);
+        }
+        
+        function setSlidersState(disabled) {
+            angleSlider.disabled = disabled;
+            massSlider.disabled = disabled;
+            frictionSlider.disabled = disabled;
+        }
+
+        // 이벤트 리스너
+        function setupEventListeners() {
+            window.addEventListener('resize', resizeCanvas);
+            
+            [angleSlider, massSlider, frictionSlider].forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    if (state.isRunning) return;
+                    
+                    const { id, value } = e.target;
+                    if (id === 'angle') state.angle = parseFloat(value);
+                    if (id === 'mass') state.mass = parseFloat(value);
+                    if (id === 'friction') state.frictionCoeff = parseFloat(value);
+                    
+                    calculate();
+                    resetSimulation();
+                });
+            });
+
+            startButton.addEventListener('click', () => {
+                if (state.isRunning) {
+                    stopSimulation();
+                    resetSimulation();
+                } else {
+                    resetSimulation();
+                    startSimulation();
+                }
+            });
+        }
+
+        // 초기화
+        function init() {
+            resizeCanvas();
+            calculate();
+            resetSimulation();
+            setupEventListeners();
+        }
+
+        init();
+    </script>
+</body>
+</html>
