@@ -55,8 +55,10 @@ jobs:
             echo "index.html 변경 없음 — 커밋 건너뜀"
           fi
 
-      - name: Pages 설정
+      - name: Pages 설정 (필요 시 자동 활성화)
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: 사이트 파일 업로드
         uses: actions/upload-pages-artifact@v3
