@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>감수분열 전체 과정 시뮬레이션</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        #cell-container {
+            transition: all 0.5s ease-in-out;
+        }
+        .cell {
+            position: relative;
+            border: 4px solid #ea580c;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #f1f5f9;
+            flex-shrink: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+        }
+        #cell {
+            width: 90vw;
+            height: 60vw;
+            max-width: 800px;
+            max-height: 500px;
+            border-radius: 45%; /* More elliptical shape */
+        }
+        .daughter-cell {
+            width: 45vw;
+            height: 60vw;
+            max-width: 390px;
+            max-height: 500px;
+            border-color: #f97316;
+            border-radius: 45%;
+        }
+        .final-cell {
+            width: 40vw;
+            height: 40vw;
+            max-width: 350px;
+            max-height: 350px;
+            border-color: #fb923c;
+        }
+        .pole {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #fb923c;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .chromosome {
+            position: absolute;
+            transform: translate(-50%, -50%); /* Center the chromosome div */
+        }
+        .chromatid-a, .chromatid-b {
+            position: absolute;
+            width: 6px; /* thickness */
+            border-radius: 3px;
+            top: 50%;
+            left: 50%;
+            transform-origin: center;
+        }
+        .chromatid-a {
+            transform: translate(-50%, -50%) rotate(30deg);
+        }
+        .chromatid-b {
+            transform: translate(-50%, -50%) rotate(-30deg);
+        }
+        .daughter-chromosome {
+            position: absolute;
+            width: 6px;
+            border-radius: 3px;
+            transform: translate(-50%, -50%); /* Center the daughter chromosome */
+        }
+        .spindle {
+            position: absolute;
+            height: 2px;
+            background-color: #fcd34d;
+            transform-origin: 0 50%;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 text-center">
+            <h1 class="text-3xl font-bold text-orange-600 mb-2">감수분열 시뮬레이션</h1>
+            <p class="text-slate-600 mb-4">감수 1분열과 2분열의 연속적인 과정을 관찰해 보세요.</p>
+            <div id="status-container" class="mb-4 h-12 flex items-center justify-center bg-orange-50 rounded-lg">
+                <p id="status" class="text-xl font-semibold text-orange-700">시작 버튼을 눌러주세요</p>
+            </div>
+            
+            <div class="flex justify-center items-center space-x-2 mb-4">
+                <label for="ploidyInput" class="text-lg font-semibold text-slate-700">핵상 (2n) =</label>
+                <input type="number" id="ploidyInput" value="6" min="6" max="12" step="2" class="w-20 text-center text-lg font-bold border-2 border-slate-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+            </div>
+
+            <div id="cell-container" class="my-6 flex justify-center items-center flex-wrap gap-4">
+                <!-- Cell(s) will be dynamically added here -->
+            </div>
+
+            <div class="flex justify-center space-x-4">
+                <button id="startBtn" class="px-6 py-3 bg-orange-600 text-white font-bold rounded-lg shadow-md hover:bg-orange-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50">
+                    시뮬레이션 시작
+                </button>
+                <button id="pauseBtn" class="px-6 py-3 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-50 disabled:bg-slate-300 disabled:cursor-not-allowed" disabled>
+                    일시정지
+                </button>
+                <button id="resetBtn" class="px-6 py-3 bg-slate-500 text-white font-bold rounded-lg shadow-md hover:bg-slate-600 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-opacity-50">
+                    초기화
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const cellContainer = document.getElementById('cell-container');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusDiv = document.getElementById('status');
+        const ploidyInput = document.getElementById('ploidyInput');
+        
+        let NUM_CHROMOSOME_PAIRS = 3;
+        let NUM_CHROMOSOMES = 6;
+        const PAIR_STYLES = [
+            { size: 36, colors: ['#6366f1', '#a5b4fc'] }, // Indigo pair
+            { size: 28, colors: ['#ef4444', '#fca5a5'] }, // Red pair
+            { size: 20, colors: ['#22c55e', '#86efac'] }, // Green pair
+            { size: 32, colors: ['#f97316', '#fdba74'] }, // Orange pair
+            { size: 24, colors: ['#8b5cf6', '#c4b5fd'] }, // Violet pair
+            { size: 18, colors: ['#14b8a6', '#6ee7b7'] }  // Teal pair
+        ];
+        const METAPHASE_SPEED = 0.03;
+        const ANAPHASE_1_SPEED = 1.2;
+        const ANAPHASE_2_SPEED = 0.8;
+
+        // Data stores
+        let chromosomes = []; // Holds chromosome data for Meiosis I
+        let meiosis2Cells = []; // Holds data for the two cells in Meiosis II
+
+        // State management
+        let simulationState = 'idle'; // 'idle', 'running', 'paused', 'finished1', 'finished'
+        let currentPhase = ''; // 'metaphase1', 'anaphase1', 'metaphase2', 'anaphase2'
+        let animationFrameId;
+        
+        function init() {
+            cellContainer.innerHTML = '';
+
+            const ploidyLabel = document.querySelector('label[for="ploidyInput"]');
+            if (ploidyLabel) {
+                ploidyLabel.textContent = '핵상 (2n) =';
+            }
+
+            NUM_CHROMOSOMES = parseInt(ploidyInput.value, 10);
+            if (NUM_CHROMOSOMES % 2 !== 0 || NUM_CHROMOSOMES < 2 || NUM_CHROMOSOMES > 12) {
+                NUM_CHROMOSOMES = 6;
+                ploidyInput.value = 6;
+            }
+            NUM_CHROMOSOME_PAIRS = NUM_CHROMOSOMES / 2;
+            
+            const cell = document.createElement('div');
+            cell.id = 'cell';
+            cell.className = 'cell';
+            cellContainer.appendChild(cell);
+
+            chromosomes = [];
+            meiosis2Cells = [];
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            
+            const cellRect = cell.getBoundingClientRect();
+            
+            const pole1El = createPoleElement(30, cellRect.height / 2);
+            cell.appendChild(pole1El);
+            const pole2El = createPoleElement(cellRect.width - 30, cellRect.height / 2);
+            cell.appendChild(pole2El);
+
+            const poles = [
+                { x: 30, y: cellRect.height / 2, element: pole1El },
+                { x: cellRect.width - 30, y: cellRect.height / 2, element: pole2El }
+            ];
+
+            for (let i = 0; i < NUM_CHROMOSOMES; i += 2) {
+                const pairId = i / 2;
+                const paternalIsLeft = Math.random() < 0.5;
+
+                const isY = pairId === NUM_CHROMOSOME_PAIRS - 1;
+                const paternalChr = createChromosome(cellRect, i, poles, false);
+                paternalChr.targetY = (cellRect.height / (NUM_CHROMOSOME_PAIRS + 1)) * (pairId + 1);
+                paternalChr.targetX = paternalIsLeft ? cellRect.width / 2 - 15 : cellRect.width / 2 + 15;
+                chromosomes.push(paternalChr);
+                cell.appendChild(paternalChr.element);
+
+                const maternalChr = createChromosome(cellRect, i + 1, poles, isY);
+                maternalChr.targetY = (cellRect.height / (NUM_CHROMOSOME_PAIRS + 1)) * (pairId + 1);
+                maternalChr.targetX = paternalIsLeft ? cellRect.width / 2 + 15 : cellRect.width / 2 - 15;
+                chromosomes.push(maternalChr);
+                cell.appendChild(maternalChr.element);
+            }
+
+            simulationState = 'idle';
+            currentPhase = '';
+            statusDiv.textContent = '시작 버튼을 눌러주세요';
+            startBtn.disabled = false;
+            startBtn.textContent = '시뮬레이션 시작';
+            pauseBtn.disabled = true;
+            pauseBtn.textContent = '일시정지';
+        }
+
+        function createPoleElement(x, y) {
+            const poleEl = document.createElement('div');
+            poleEl.className = 'pole';
+            poleEl.style.left = `${x}px`;
+            poleEl.style.top = `${y}px`;
+            return poleEl;
+        }
+
+        function createChromosome(cellRect, index, poles, isY = false) {
+            const element = document.createElement('div');
+            element.className = 'chromosome';
+            
+            const pairId = Math.floor(index / 2);
+            const style = PAIR_STYLES[pairId];
+            const color = style.colors[index % 2];
+            element.dataset.color = color;
+
+            const chromatidA = document.createElement('div');
+            chromatidA.className = 'chromatid-a';
+            const chromatidB = document.createElement('div');
+            chromatidB.className = 'chromatid-b';
+            
+            if (isY) {
+                const y_size = style.size; 
+                [chromatidA, chromatidB].forEach(el => {
+                    el.style.backgroundColor = color;
+                    el.style.height = `${y_size}px`;
+                    el.style.transformOrigin = 'bottom center';
+                });
+                
+                // Override CSS class transforms to form a '^' shape
+                chromatidA.style.transform = 'translate(-50%, -100%) rotate(-30deg)';
+                chromatidB.style.transform = 'translate(-50%, -100%) rotate(30deg)';
+
+            } else {
+                const chromatidSize = style.size;
+                [chromatidA, chromatidB].forEach(el => {
+                    el.style.backgroundColor = color;
+                    el.style.height = `${chromatidSize}px`;
+                });
+            }
+            
+            element.appendChild(chromatidA);
+            element.appendChild(chromatidB);
+
+            const chromosome = {
+                element: element,
+                x: Math.random() * (cellRect.width - 100) + 50,
+                y: Math.random() * (cellRect.height - 50) + 25,
+                targetX: 0, targetY: 0,
+                finalX: 0, finalY: 0,
+                spindle: null, isAligned: false, size: style.size,
+                poles: poles, isY: isY
+            };
+            
+            updateElementPosition(chromosome);
+            return chromosome;
+        }
+        
+        function updateElementPosition(obj) {
+            obj.element.style.left = `${obj.x}px`;
+            obj.element.style.top = `${obj.y}px`;
+        }
+
+        function updateSpindle(startPos, endPos, spindleEl) {
+            const dx = endPos.x - startPos.x;
+            const dy = endPos.y - startPos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            spindleEl.style.width = `${distance}px`;
+            spindleEl.style.left = `${startPos.x}px`;
+            spindleEl.style.top = `${startPos.y - 1}px`;
+            spindleEl.style.transform = `rotate(${angle}rad)`;
+        }
+
+        function setupMeiosis2InBothCells() {
+            meiosis2Cells = [];
+            const daughterCells = document.querySelectorAll('.daughter-cell');
+
+            daughterCells.forEach((cellEl) => {
+                const cellRect = cellEl.getBoundingClientRect();
+                
+                const pole1El = createPoleElement(30, cellEl.clientHeight / 2);
+                cellEl.appendChild(pole1El);
+                const pole2El = createPoleElement(cellEl.clientWidth - 30, cellEl.clientHeight / 2);
+                cellEl.appendChild(pole2El);
+
+                const cellPoles = [
+                    { x: 30, y: cellEl.clientHeight / 2, element: pole1El },
+                    { x: cellEl.clientWidth - 30, y: cellEl.clientHeight / 2, element: pole2El }
+                ];
+
+                const cellChromosomes = [];
+                const chromosomeElements = cellEl.querySelectorAll('.chromosome');
+                const spacing = cellEl.clientHeight / (chromosomeElements.length + 1);
+
+                chromosomeElements.forEach((chromoEl, i) => {
+                    const originalChromo = chromosomes.find(c => c.element === chromoEl);
+                    if (originalChromo) {
+                        originalChromo.x = parseFloat(originalChromo.element.style.left);
+                        originalChromo.y = parseFloat(originalChromo.element.style.top);
+                        
+                        originalChromo.targetX = cellRect.width / 2;
+                        originalChromo.targetY = spacing * (i + 1);
+                        originalChromo.isAligned = false;
+                        originalChromo.spindle = null;
+                        originalChromo.poles = cellPoles;
+                        cellChromosomes.push(originalChromo);
+                    }
+                });
+
+                meiosis2Cells.push({
+                    cellElement: cellEl,
+                    chromosomes: cellChromosomes,
+                    poles: cellPoles,
+                    daughterChromosomes: []
+                });
+            });
+        }
+
+        function performCytokinesis() {
+            statusDiv.textContent = '세포질 분열 I: 세포가 나뉘어집니다.';
+            const originalCell = document.getElementById('cell');
+            
+            chromosomes.sort((a,b) => a.finalX - b.finalX);
+            const leftChromosomes = chromosomes.slice(0, NUM_CHROMOSOME_PAIRS);
+            const rightChromosomes = chromosomes.slice(NUM_CHROMOSOME_PAIRS);
+
+            originalCell.style.opacity = '0';
+
+            setTimeout(() => {
+                cellContainer.innerHTML = '';
+                
+                const daughterCell1 = document.createElement('div');
+                daughterCell1.className = 'cell daughter-cell';
+                const daughterCell2 = document.createElement('div');
+                daughterCell2.className = 'cell daughter-cell';
+
+                cellContainer.appendChild(daughterCell1);
+                cellContainer.appendChild(daughterCell2);
+
+                requestAnimationFrame(() => {
+                    const daughterRect = daughterCell1.getBoundingClientRect();
+                    const spacing = daughterRect.height / (leftChromosomes.length + 1);
+
+                    leftChromosomes.forEach((c, i) => {
+                        daughterCell1.appendChild(c.element);
+                        c.x = daughterRect.width / 2;
+                        c.y = spacing * (i + 1);
+                        updateElementPosition(c);
+                        c.element.style.transform = 'translate(-50%, -50%)';
+                    });
+
+                    rightChromosomes.forEach((c, i) => {
+                        daughterCell2.appendChild(c.element);
+                        c.x = daughterRect.width / 2;
+                        c.y = spacing * (i + 1);
+                        updateElementPosition(c);
+                        c.element.style.transform = 'translate(-50%, -50%)';
+                    });
+                });
+
+                setTimeout(() => {
+                    simulationState = 'finished1';
+                    statusDiv.textContent = '감수 1분열 완료! 2분열을 시작하세요.';
+                    startBtn.textContent = '감수 2분열 시작';
+                    startBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    ploidyInput.disabled = true;
+                }, 500);
+
+            }, 500);
+        }
+
+        function performCytokinesis2() {
+            statusDiv.textContent = '세포질 분열 II: 4개의 딸세포가 생성됩니다.';
+            
+            document.querySelectorAll('.daughter-cell').forEach(cell => {
+                   cell.style.opacity = '0';
+            });
+
+            const finalChromosomeData = [];
+            meiosis2Cells.forEach(cellData => {
+                const group1 = cellData.daughterChromosomes.filter(dc => dc.finalX < cellData.cellElement.clientWidth / 2);
+                const group2 = cellData.daughterChromosomes.filter(dc => dc.finalX >= cellData.cellElement.clientWidth / 2);
+                finalChromosomeData.push(group1, group2);
+            });
+            
+            setTimeout(() => {
+                cellContainer.innerHTML = ''; 
+                cellContainer.style.maxWidth = '900px';
+
+                const finalCells = [];
+                for(let i = 0; i < 4; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell final-cell';
+                    cellContainer.appendChild(cell);
+                    finalCells.push(cell);
+                }
+                
+                requestAnimationFrame(() => {
+                    finalCells.forEach((cell, i) => {
+                        const group_data = finalChromosomeData[i];
+                        const cellRect = cell.getBoundingClientRect();
+                        const spacing = cellRect.height / (group_data.length + 1);
+                        
+                        group_data.forEach((chromo_data, idx) => {
+                            const element = document.createElement('div');
+                            element.className = 'daughter-chromosome';
+                            element.style.height = `${chromo_data.isY ? chromo_data.size * 0.65 : chromo_data.size}px`;
+                            element.style.backgroundColor = chromo_data.color;
+
+                            element.style.position = 'absolute';
+                            element.style.left = `50%`;
+                            element.style.top = `${spacing * (idx + 1)}px`;
+                            element.style.transform = `translate(-50%, -50%)`;
+                            
+                            cell.appendChild(element);
+                        });
+                    });
+                });
+
+                setTimeout(() => {
+                    simulationState = 'finished';
+                    statusDiv.textContent = '감수분열 완료!';
+                    pauseBtn.disabled = true;
+                    startBtn.disabled = true;
+
+                    const ploidyLabel = document.querySelector('label[for="ploidyInput"]');
+                    if (ploidyLabel) {
+                        ploidyLabel.textContent = '핵상 (n) =';
+                    }
+                    ploidyInput.value = NUM_CHROMOSOME_PAIRS;
+
+                }, 500);
+
+            }, 500);
+        }
+
+        function animate() {
+            if (simulationState !== 'running') return;
+
+            if (currentPhase === 'metaphase1') {
+                statusDiv.textContent = '중기 I: 상동 염색체 쌍이 중앙에 정렬합니다.';
+                let allAligned = true;
+                chromosomes.forEach(c => { if (!c.isAligned) allAligned = false; });
+
+                if (!allAligned) {
+                    chromosomes.forEach((c) => {
+                        if (!c.isAligned) {
+                            c.x += (c.targetX - c.x) * METAPHASE_SPEED;
+                            c.y += (c.targetY - c.y) * METAPHASE_SPEED;
+                            updateElementPosition(c);
+                            if (Math.hypot(c.targetX - c.x, c.targetY - c.y) < 1) {
+                                c.isAligned = true;
+                                c.x = c.targetX;
+                                c.y = c.targetY;
+                                updateElementPosition(c);
+                            }
+                        }
+                    });
+                } else {
+                    chromosomes.forEach((c) => {
+                         if (!c.spindle) {
+                            c.spindle = document.createElement('div');
+                            c.spindle.className = 'spindle';
+                            c.element.parentElement.appendChild(c.spindle);
+                         }
+                         const poleIndex = c.x > c.element.parentElement.getBoundingClientRect().width / 2 ? 1 : 0;
+                         updateSpindle(c.poles[poleIndex], c, c.spindle);
+                    });
+
+                    setTimeout(() => {
+                        currentPhase = 'anaphase1';
+                        chromosomes.forEach((c, i) => {
+                            const pairId = Math.floor(i / 2);
+                            const poleIndex = c.x > c.element.parentElement.getBoundingClientRect().width / 2 ? 1 : 0;
+                            const pole = c.poles[poleIndex];
+                            c.finalX = pole.x + (poleIndex === 0 ? 40 : -40);
+                            c.finalY = pole.y + (pairId - (NUM_CHROMOSOME_PAIRS -1)/2) * (c.size + 15);
+                        });
+                    }, 200);
+                }
+            } else if (currentPhase === 'anaphase1') {
+                statusDiv.textContent = '후기 I: 상동 염색체가 분리됩니다.';
+                let allSeparated = true;
+                chromosomes.forEach((c) => {
+                    const dist = Math.hypot(c.finalX - c.x, c.finalY - c.y);
+                    if (dist > ANAPHASE_1_SPEED) {
+                        allSeparated = false;
+                        const angle = Math.atan2(c.finalY - c.y, c.finalX - c.x);
+                        c.x += Math.cos(angle) * ANAPHASE_1_SPEED;
+                        c.y += Math.sin(angle) * ANAPHASE_1_SPEED;
+                        updateElementPosition(c);
+                        
+                        const poleIndex = c.finalX < c.element.parentElement.getBoundingClientRect().width / 2 ? 0 : 1;
+                        if(c.spindle) updateSpindle(c.poles[poleIndex], c, c.spindle);
+                    } else if (c.spindle.style.display !== 'none') {
+                        c.x = c.finalX; c.y = c.finalY; updateElementPosition(c);
+                        c.spindle.style.display = 'none';
+                    }
+                });
+                if (allSeparated) {
+                    simulationState = 'paused';
+                    cancelAnimationFrame(animationFrameId);
+                    performCytokinesis();
+                }
+            } else if (currentPhase === 'metaphase2') {
+                statusDiv.textContent = '중기 II: 염색체가 중앙에 정렬합니다.';
+                let allCellsAligned = true;
+                
+                meiosis2Cells.forEach(cellData => {
+                    let allInCellAligned = true;
+                    cellData.chromosomes.forEach(c => { if (!c.isAligned) allInCellAligned = false; });
+
+                    if (!allInCellAligned) {
+                        allCellsAligned = false;
+                        cellData.chromosomes.forEach((c) => {
+                             if (!c.isAligned) {
+                                c.element.style.transform = 'translate(-50%, -50%)';
+                                c.x += (c.targetX - c.x) * METAPHASE_SPEED * 3;
+                                c.y += (c.targetY - c.y) * METAPHASE_SPEED * 3;
+                                updateElementPosition(c);
+                                if (Math.hypot(c.targetX - c.x, c.targetY - c.y) < 1) {
+                                    c.isAligned = true;
+                                    c.x = c.targetX; c.y = c.targetY;
+                                }
+                            }
+                        });
+                    } else { 
+                        cellData.chromosomes.forEach((c) => {
+                            if (!c.spindle) {
+                                c.spindle = [document.createElement('div'), document.createElement('div')];
+                                c.spindle.forEach(s => { s.className = 'spindle'; cellData.cellElement.appendChild(s); });
+                            }
+                            updateSpindle(c.poles[0], c, c.spindle[0]);
+                            updateSpindle(c.poles[1], c, c.spindle[1]);
+                        });
+                    }
+                });
+
+                if (allCellsAligned) {
+                     setTimeout(() => {
+                        currentPhase = 'anaphase2';
+                        meiosis2Cells.forEach(cellData => {
+                            cellData.chromosomes.forEach(c => {
+                                c.element.style.display = 'none';
+                                if (c.spindle) c.spindle.forEach(s => s.style.display = 'none');
+                                
+                                const spindle1 = document.createElement('div');
+                                spindle1.className = 'spindle';
+                                cellData.cellElement.appendChild(spindle1);
+
+                                const spindle2 = document.createElement('div');
+                                spindle2.className = 'spindle';
+                                cellData.cellElement.appendChild(spindle2);
+
+                                const d1 = { size: c.size, x: c.x, y: c.y, finalX: c.poles[0].x + 30, finalY: c.y, color: c.element.dataset.color, isY: c.isY, spindle: spindle1, poleIndex: 0 };
+                                const d2 = { size: c.size, x: c.x, y: c.y, finalX: c.poles[1].x - 30, finalY: c.y, color: c.element.dataset.color, isY: c.isY, spindle: spindle2, poleIndex: 1 };
+                                
+                                cellData.daughterChromosomes.push(d1, d2);
+                            });
+                            cellData.chromosomes = [];
+                        });
+                    }, 200);
+                }
+            } else if (currentPhase === 'anaphase2') {
+                statusDiv.textContent = '후기 II: 염색 분체가 분리됩니다.';
+                let allCellsSeparated = true;
+                
+                meiosis2Cells.forEach(cellData => {
+                    if (cellData.daughterChromosomes.length > 0 && !cellData.daughterChromosomes[0].element) {
+                        cellData.daughterChromosomes.forEach(dc => {
+                            const el = document.createElement('div');
+                            el.className = 'daughter-chromosome';
+                            el.style.backgroundColor = dc.color;
+                            el.style.height = `${dc.isY ? dc.size * 0.65 : dc.size}px`;
+                            el.style.transform = `translate(-50%, -50%)`;
+                            dc.element = el;
+                            updateElementPosition(dc);
+                            cellData.cellElement.appendChild(el);
+                        });
+                    }
+
+                    let allInCellSeparated = true;
+                    cellData.daughterChromosomes.forEach(dc => {
+                        const dist = Math.hypot(dc.finalX - dc.x, dc.finalY - dc.y);
+                        if (dist > ANAPHASE_2_SPEED) {
+                            allInCellSeparated = false;
+                            const angle = Math.atan2(dc.finalY - dc.y, dc.finalX - dc.x);
+                            dc.x += Math.cos(angle) * ANAPHASE_2_SPEED;
+                            dc.y += Math.sin(angle) * ANAPHASE_2_SPEED;
+                            updateElementPosition(dc);
+                            if(dc.spindle) updateSpindle(cellData.poles[dc.poleIndex], dc, dc.spindle);
+                        } else if (dc.spindle && dc.spindle.style.display !== 'none') {
+                            dc.x = dc.finalX;
+                            dc.y = dc.finalY;
+                            updateElementPosition(dc);
+                            dc.spindle.style.display = 'none';
+                        }
+                    });
+                    if (!allInCellSeparated) allCellsSeparated = false;
+                });
+                
+                if(allCellsSeparated) {
+                    let allSpindlesHidden = true;
+                    meiosis2Cells.forEach(cellData => {
+                        cellData.daughterChromosomes.forEach(dc => {
+                            if (dc.spindle && dc.spindle.style.display !== 'none') {
+                                allSpindlesHidden = false;
+                            }
+                        });
+                    });
+
+                    if (allSpindlesHidden) {
+                         simulationState = 'paused';
+                         cancelAnimationFrame(animationFrameId);
+                         performCytokinesis2();
+                    }
+                }
+            }
+            if (simulationState === 'running') {
+                 animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (simulationState === 'idle') {
+                ploidyInput.disabled = true;
+                simulationState = 'running';
+                currentPhase = 'metaphase1';
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                animate();
+            } else if (simulationState === 'finished1') {
+                setupMeiosis2InBothCells();
+                simulationState = 'running';
+                currentPhase = 'metaphase2';
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                animate();
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (simulationState === 'running') {
+                simulationState = 'paused';
+                pauseBtn.textContent = '계속';
+                statusDiv.textContent += ' (일시정지됨)';
+                cancelAnimationFrame(animationFrameId);
+            } else if (simulationState === 'paused') {
+                simulationState = 'running';
+                pauseBtn.textContent = '일시정지';
+                statusDiv.textContent = statusDiv.textContent.replace(' (일시정지됨)', '');
+                animate();
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            ploidyInput.disabled = false;
+            init();
+        });
+
+        ploidyInput.addEventListener('change', init);
+        window.addEventListener('resize', init);
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
