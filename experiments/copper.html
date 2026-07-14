@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구리의 산화-환원 반응 (완성본)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            user-select: none;
+        }
+        
+        /* 불꽃 애니메이션 */
+        @keyframes flicker {
+            0%, 100% { transform: scaleY(1) translateX(-50%); opacity: 0.9; }
+            50% { transform: scaleY(1.05) translateX(-50%); opacity: 1; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .flame-outer {
+            animation: flicker 1.5s infinite ease-in-out;
+            transform-origin: bottom center;
+        }
+        .flame-inner {
+            animation: flicker 1.7s infinite ease-in-out;
+            transform-origin: bottom center;
+        }
+
+        #copper-wire {
+            cursor: grab;
+            z-index: 50;
+        }
+        #copper-wire:active {
+            cursor: grabbing;
+        }
+
+        /* 분자 스타일 */
+        .oxygen-molecule {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background-color: rgba(34, 149, 241, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1f2937;
+            font-weight: bold;
+            font-size: 10px;
+            border: 1px solid rgba(34, 149, 241, 0.7);
+            animation: float 4s ease-in-out infinite;
+            transition: transform 1.2s cubic-bezier(0.4, 0, 0.8, 1), opacity 0.4s ease-out 0.8s;
+            z-index: 20;
+        }
+        .oxygen-molecule.reacting {
+            opacity: 0;
+        }
+        
+        .co-molecule {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background-color: rgba(108, 122, 137, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f9fafb;
+            font-weight: bold;
+            font-size: 10px;
+            border: 1px solid rgba(55, 65, 81, 0.5);
+            transition: transform 0.4s ease-in, opacity 0.4s ease-in;
+            z-index: 30;
+        }
+        @keyframes rise {
+            from { transform: translateY(0); opacity: 0.8; }
+            to { transform: translateY(-80px); opacity: 0; }
+        }
+        .co-molecule.rising {
+            animation: rise 3s linear infinite;
+        }
+
+        .co2-molecule {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background-color: rgba(132, 146, 166, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f9fafb;
+            font-weight: bold;
+            font-size: 10px;
+            border: 1px solid rgba(55, 65, 81, 0.5);
+            z-index: 31;
+        }
+        @keyframes diffuse {
+            from { transform: translate(0, 0) scale(1); opacity: 1; }
+            to { transform: translate(30px, -90px) scale(1.2); opacity: 0; }
+        }
+        .co2-molecule.diffusing {
+            animation: diffuse 2s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- 좌측: 시뮬레이션 패널 -->
+        <div id="simulation-panel" class="relative w-full md:w-1/2 bg-blue-50 h-[500px] flex justify-center items-end pb-12 border-b md:border-b-0 md:border-r border-gray-200 overflow-hidden">
+            <div class="absolute top-4 left-4 text-gray-400 font-bold text-lg">Simulation Area</div>
+            
+            <!-- 분자들이 생성될 컨테이너 -->
+            <div id="molecules-container" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
+
+            <!-- 알코올 램프 본체 -->
+            <div class="relative w-24 h-24 flex justify-center z-10 pointer-events-none">
+                <div class="absolute bottom-0 w-20 h-16 bg-gray-300 rounded-b-2xl border-t-8 border-gray-400"></div>
+                <div class="absolute bottom-16 w-4 h-6 bg-gray-700 rounded-t-sm"></div>
+            </div>
+
+            <!-- 불꽃 효과 -->
+            <div class="absolute bottom-28 left-1/2 w-0 h-0 z-20 pointer-events-none">
+                <div id="outer-flame-label" class="absolute -right-24 bottom-16 text-center p-1 rounded bg-red-100 border border-red-300 pointer-events-auto">
+                    <p class="font-bold text-red-600 text-xs">겉불꽃 (O₂ 풍부)</p>
+                </div>
+                <div id="outer-flame" class="flame-outer absolute bottom-0 left-1/2 w-24 h-40 bg-gradient-to-t from-red-500 via-orange-400 to-yellow-200 rounded-t-full opacity-80 blur-md" style="transform: translateX(-50%);"></div>
+                
+                <div id="inner-flame-label" class="absolute -left-28 bottom-8 text-center p-1 rounded bg-blue-100 border border-blue-300 pointer-events-auto">
+                   <p class="font-bold text-blue-600 text-xs">속불꽃 (CO 발생)</p>
+                </div>
+                <div id="inner-flame" class="flame-inner absolute bottom-0 left-1/2 w-12 h-20 bg-gradient-to-t from-blue-600 via-cyan-400 to-blue-300 rounded-t-full opacity-90 blur-sm" style="transform: translateX(-50%);"></div>
+            </div>
+
+            <!-- 드래그 가능한 구리선 -->
+            <div id="copper-wire" class="absolute w-3 h-40 rounded-full shadow-lg" style="background-image: linear-gradient(to bottom, #f3a683, #b9775e); top: 50px; left: 50px; transform: rotate(45deg); transform-origin: center center;">
+                <div id="copper-label" class="absolute top-1/2 left-full ml-2 -translate-y-1/2 bg-white px-2 py-1 rounded shadow text-sm font-bold text-gray-700 whitespace-nowrap pointer-events-none" style="transform: rotate(-45deg);">구리선 (Cu)</div>
+                <!-- 충돌 판정을 위한 구리선 끝부분 -->
+                <div id="wire-tip" class="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"></div>
+            </div>
+        </div>
+
+        <!-- 우측: 정보 및 조작 패널 -->
+        <div class="w-full md:w-1/2 p-8 flex flex-col justify-center">
+            <h1 class="text-3xl font-bold text-cyan-700 mb-2">구리의 산화-환원 반응</h1>
+            <p class="text-gray-500 mb-8 font-medium">최종 완성본: 미시적 분자 반응 시뮬레이션</p>
+
+            <div id="info-panel" class="bg-gray-50 border border-gray-200 p-6 rounded-xl mb-8 min-h-[220px] flex flex-col justify-center">
+                <h2 id="info-title" class="text-xl font-bold text-gray-800 mb-3">실험 준비</h2>
+                <p id="info-desc" class="text-gray-600 mb-4">
+                    구리선을 드래그하여 알코올 램프의 <strong>겉불꽃</strong> 또는 <strong>속불꽃</strong>에 위치시킨 후 '반응 시작' 버튼을 누르세요.
+                </p>
+                <!-- 화학 반응식 표시 영역 -->
+                <div id="equation-box" class="hidden bg-white border border-gray-300 p-3 rounded text-center font-mono font-bold text-lg text-gray-800 shadow-inner">
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button id="btn-start" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    반응 시작
+                </button>
+                <button id="btn-reset" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg shadow transition-colors">
+                    실험 초기화
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 요소
+        const wire = document.getElementById('copper-wire');
+        const wireTip = document.getElementById('wire-tip');
+        const outerFlame = document.getElementById('outer-flame');
+        const innerFlame = document.getElementById('inner-flame');
+        const container = document.getElementById('simulation-panel');
+        const moleculesContainer = document.getElementById('molecules-container');
+        
+        const infoTitle = document.getElementById('info-title');
+        const infoDesc = document.getElementById('info-desc');
+        const equationBox = document.getElementById('equation-box');
+        const copperLabel = document.getElementById('copper-label');
+        const btnStart = document.getElementById('btn-start');
+        const btnReset = document.getElementById('btn-reset');
+
+        // 상태 변수
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+        let currentState = 'cu'; // 'cu' (구리), 'cuo' (산화구리)
+        let reactionInterval = null;
+        let colorInterval = null;
+        
+        // 분자 배열
+        const oxygenMolecules = [];
+        const coMolecules = [];
+        const OXYGEN_COUNT = 18;
+
+        // 분자 생성 함수 (산소) - 겹침 방지 & 불꽃 외부 배치 로직 적용
+        function createOxygen() {
+            const containerRect = container.getBoundingClientRect();
+            const flameRect = outerFlame.getBoundingClientRect();
+
+            // 불꽃의 상대 좌표 (컨테이너 기준)
+            const flameBounds = {
+                left: flameRect.left - containerRect.left,
+                right: flameRect.right - containerRect.left,
+                top: flameRect.top - containerRect.top,
+                bottom: flameRect.bottom - containerRect.top
+            };
+
+            const MIN_DISTANCE = 50; 
+            const MAX_TRIES = 100;   
+
+            for (let i = 0; i < OXYGEN_COUNT; i++) {
+                let top, left;
+                let isValidPosition = false;
+                let tries = 0;
+
+                while (!isValidPosition && tries < MAX_TRIES) {
+                    tries++;
+                    top = Math.random() * (container.clientHeight - 40);
+                    left = Math.random() * (container.clientWidth - 40);
+                    isValidPosition = true;
+
+                    // 1. 기존 분자와의 거리 확인
+                    for (const existing of oxygenMolecules) {
+                        const dist = Math.hypot(left - existing.initLeft, top - existing.initTop);
+                        if (dist < MIN_DISTANCE) {
+                            isValidPosition = false;
+                            break;
+                        }
+                    }
+
+                    // 2. 불꽃 영역 침범 확인
+                    if (isValidPosition) {
+                        const moleculeRight = left + 24; 
+                        const moleculeBottom = top + 24;  
+                        if (moleculeRight > flameBounds.left && left < flameBounds.right &&
+                            moleculeBottom > flameBounds.top && top < flameBounds.bottom) {
+                            isValidPosition = false; 
+                        }
+                    }
+                }
+
+                const mol = document.createElement('div');
+                mol.className = 'oxygen-molecule';
+                mol.textContent = 'O₂';
+                
+                mol.style.top = `${top}px`;
+                mol.style.left = `${left}px`;
+                mol.style.animationDelay = `${Math.random() * 6}s`;
+                
+                moleculesContainer.appendChild(mol);
+                oxygenMolecules.push({ el: mol, initTop: top, initLeft: left });
+            }
+        }
+
+        // 분자 생성 함수 (일산화탄소 - 속불꽃 주변)
+        function createCO() {
+            const flameRect = innerFlame.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const flameLeft = flameRect.left - containerRect.left;
+            const flameBottom = flameRect.bottom - containerRect.top;
+
+            for (let i = 0; i < 8; i++) {
+                const mol = document.createElement('div');
+                mol.className = 'co-molecule rising';
+                mol.textContent = 'CO';
+                
+                const left = flameLeft + Math.random() * flameRect.width;
+                const top = flameBottom - 40;
+                
+                mol.style.top = `${top}px`;
+                mol.style.left = `${left}px`;
+                mol.style.animationDelay = `${Math.random() * 3}s`;
+                mol.style.animationDuration = `${2 + Math.random() * 2}s`;
+                
+                moleculesContainer.appendChild(mol);
+                coMolecules.push({ el: mol });
+            }
+        }
+
+        // 초기 설정
+        function initSimulation() {
+            moleculesContainer.innerHTML = '';
+            oxygenMolecules.length = 0;
+            coMolecules.length = 0;
+            createOxygen();
+            createCO();
+            
+            wire.style.top = '50px';
+            wire.style.left = '50px';
+            wire.style.backgroundImage = 'linear-gradient(to bottom, #f3a683, #b9775e)';
+            currentState = 'cu';
+            copperLabel.textContent = '구리선 (Cu)';
+            
+            infoTitle.textContent = '실험 준비';
+            infoTitle.className = 'text-xl font-bold text-gray-800 mb-3';
+            infoDesc.innerHTML = "구리선을 드래그하여 알코올 램프의 <strong>겉불꽃</strong> 또는 <strong>속불꽃</strong>에 위치시킨 후 '반응 시작' 버튼을 누르세요.";
+            equationBox.classList.add('hidden');
+            btnStart.disabled = false;
+            
+            clearInterval(reactionInterval);
+            clearInterval(colorInterval);
+        }
+
+        // 색상 변화 애니메이션
+        function animateColor(toOxidized) {
+            let progress = 0;
+            clearInterval(colorInterval);
+            
+            colorInterval = setInterval(() => {
+                progress += 2;
+                if (progress >= 100) clearInterval(colorInterval);
+                
+                const pct = toOxidized ? progress : (100 - progress);
+                // 붉은색(#b9775e) <-> 검은색(#333333) 그라데이션 전환 (아래쪽 끝부분만)
+                wire.style.backgroundImage = `linear-gradient(to top, 
+                    rgba(51, 51, 51, ${pct/100}) 20%, 
+                    #b9775e 35%, 
+                    #f3a683 100%)`;
+            }, 80); // 약 4초에 걸쳐 서서히 변함
+        }
+
+        // 산화 반응 (겉불꽃)
+        function doOxidation(tipRect, containerRect) {
+            currentState = 'cuo';
+            copperLabel.textContent = '산화구리 (CuO)';
+            infoTitle.textContent = '산화 반응 (겉불꽃)';
+            infoTitle.className = 'text-xl font-bold text-red-600 mb-3';
+            infoDesc.innerHTML = "산소가 풍부한 겉불꽃에서는 구리가 공기 중의 산소(O₂)와 결합하여 검은색의 산화구리(CuO)로 변합니다. (산화)";
+            equationBox.textContent = '2Cu + O₂ → 2CuO';
+            equationBox.classList.remove('hidden');
+            
+            animateColor(true);
+
+            // 산소 분자 이동 애니메이션 중심 좌표
+            const targetX = tipRect.left - containerRect.left + tipRect.width/2;
+            const targetY = tipRect.top - containerRect.top + tipRect.height/2;
+
+            const MOLECULES_TO_REACT = 6;
+            const REACTION_DELAY = 500;
+
+            const reactBatch = () => {
+                // 대기 중인 산소 찾기
+                const availableMols = oxygenMolecules.filter(m => !m.el.classList.contains('reacting'));
+                if(availableMols.length === 0) return;
+                
+                // 6개 선택
+                const molsToMove = availableMols.slice(0, MOLECULES_TO_REACT);
+                
+                // 순차적 이동 (0.5초 간격)
+                molsToMove.forEach((mol, idx) => {
+                    setTimeout(() => {
+                        mol.el.style.animation = 'none';
+                        const dx = targetX - mol.el.offsetLeft - 12;
+                        const dy = targetY - mol.el.offsetTop - 12;
+                        
+                        mol.el.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`;
+                        mol.el.classList.add('reacting');
+                        
+                        // 반응 완료 후 원래 자리로 복귀 및 재생성
+                        setTimeout(() => {
+                            mol.el.style.transition = 'none';
+                            requestAnimationFrame(() => {
+                                mol.el.classList.remove('reacting');
+                                mol.el.style.opacity = '1';
+                                mol.el.style.transform = 'translate(0,0) scale(1)';
+                                mol.el.style.top = `${mol.initTop}px`;
+                                mol.el.style.left = `${mol.initLeft}px`;
+                                mol.el.style.animation = 'float 4s ease-in-out infinite';
+                                requestAnimationFrame(() => {
+                                    mol.el.style.transition = 'transform 1.2s cubic-bezier(0.4, 0, 0.8, 1), opacity 0.4s ease-out 0.8s';
+                                });
+                            });
+                        }, 2500);
+                    }, idx * REACTION_DELAY);
+                });
+            };
+
+            // 처음 즉시 실행 후, 3.5초마다 반응 배치 반복
+            reactBatch();
+            reactionInterval = setInterval(reactBatch, 3500);
+        }
+
+        // 환원 반응 (속불꽃)
+        function doReduction(tipRect, containerRect) {
+            currentState = 'cu';
+            copperLabel.textContent = '구리선 (Cu)';
+            infoTitle.textContent = '환원 반응 (속불꽃)';
+            infoTitle.className = 'text-xl font-bold text-blue-600 mb-3';
+            infoDesc.innerHTML = "산소가 부족한 속불꽃에서는 일산화탄소(CO)가 산화구리의 산소를 빼앗아 이산화탄소(CO₂)로 날아가고, 붉은 구리(Cu)로 되돌아옵니다. (환원)";
+            equationBox.textContent = 'CuO + CO → Cu + CO₂';
+            equationBox.classList.remove('hidden');
+            
+            animateColor(false);
+
+            // CO 분자 이동 및 CO2 생성 애니메이션 좌표
+            const targetX = tipRect.left - containerRect.left + tipRect.width/2;
+            const targetY = tipRect.top - containerRect.top + tipRect.height/2;
+
+            reactionInterval = setInterval(() => {
+                const availableMols = coMolecules.filter(m => m.el.style.opacity !== '0');
+                if(availableMols.length === 0) return;
+                
+                const mol = availableMols[Math.floor(Math.random() * availableMols.length)];
+                mol.el.classList.remove('rising');
+                
+                const dx = targetX - mol.el.offsetLeft - 11;
+                const dy = targetY - mol.el.offsetTop - 11;
+                
+                mol.el.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`;
+                mol.el.style.opacity = '0';
+                
+                setTimeout(() => {
+                    // CO2 생성하여 날아가는 효과
+                    const co2 = document.createElement('div');
+                    co2.className = 'co2-molecule diffusing';
+                    co2.textContent = 'CO₂';
+                    co2.style.left = `${targetX - 13}px`;
+                    co2.style.top = `${targetY - 13}px`;
+                    moleculesContainer.appendChild(co2);
+                    
+                    setTimeout(() => co2.remove(), 2000);
+                    
+                    // CO 분자 재생성
+                    setTimeout(() => {
+                        mol.el.style.transition = 'none';
+                        mol.el.style.transform = 'translate(0,0) scale(1)';
+                        mol.el.style.opacity = '1';
+                        mol.el.classList.add('rising');
+                        requestAnimationFrame(() => {
+                            mol.el.style.transition = 'transform 0.5s ease-in, opacity 0.5s ease-in';
+                        });
+                    }, 1000);
+                }, 500);
+
+            }, 800); // 0.8초마다 속불꽃 반응
+        }
+
+        // 반응 시작 버튼 로직
+        btnStart.addEventListener('click', () => {
+            const tipRect = wireTip.getBoundingClientRect();
+            const innerRect = innerFlame.getBoundingClientRect();
+            const outerRect = outerFlame.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            // 충돌 판정 (구리선 끝이 불꽃 안에 있는지 여부)
+            const inInnerFlame = (tipRect.left > innerRect.left && tipRect.right < innerRect.right && tipRect.bottom > innerRect.top);
+            const inOuterFlame = (tipRect.left > outerRect.left && tipRect.right < outerRect.right && tipRect.bottom > outerRect.top);
+
+            btnStart.disabled = true;
+
+            if (inInnerFlame) {
+                if (currentState === 'cuo') doReduction(tipRect, containerRect);
+                else {
+                    alert("이미 환원된 붉은 구리 상태입니다. 겉불꽃에서 먼저 산화시켜주세요.");
+                    btnStart.disabled = false;
+                }
+            } else if (inOuterFlame) {
+                if (currentState === 'cu') doOxidation(tipRect, containerRect);
+                else {
+                    alert("이미 산화된 검은 산화구리 상태입니다. 속불꽃에서 환원시켜주세요.");
+                    btnStart.disabled = false;
+                }
+            } else {
+                alert("구리선의 끝을 알코올 램프 불꽃 영역에 위치시켜 주세요.");
+                btnStart.disabled = false;
+            }
+        });
+
+        // 초기화 버튼 로직
+        btnReset.addEventListener('click', initSimulation);
+
+        // 구리선 드래그 로직
+        wire.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialLeft = wire.offsetLeft;
+            initialTop = wire.offsetTop;
+            btnStart.disabled = false;
+            
+            // 드래그 시작하면 진행 중이던 분자 반응 멈춤 (자연스러움을 위해)
+            clearInterval(reactionInterval); 
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            wire.style.left = `${initialLeft + dx}px`;
+            wire.style.top = `${initialTop + dy}px`;
+        });
+
+        document.addEventListener('mouseup', () => { isDragging = false; });
+
+        // 앱 시작 시 초기화
+        window.onload = initSimulation;
+    </script>
+</body>
+</html>
