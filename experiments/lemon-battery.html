@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>레몬 전지 만들기</title>
+  <meta name="description" content="레몬 속 산과 두 가지 금속으로 전기를 만들어 작은 LED를 켜 봅니다." />
+  <meta name="experiment:emoji" content="🍋" />
+  <meta name="experiment:category" content="전기·에너지" />
+  <meta name="experiment:order" content="20" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      line-height: 1.7;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    a.back { color: #38bdf8; text-decoration: none; }
+    h1 { font-size: 2rem; }
+    .demo {
+      text-align: center; background: #1e293b; border-radius: 16px;
+      padding: 2rem 1.5rem; margin: 1.5rem 0;
+    }
+    .lemon { font-size: 4rem; }
+    .bulb { font-size: 3rem; transition: filter 0.3s, opacity 0.3s; opacity: 0.3; }
+    .bulb.on { opacity: 1; filter: drop-shadow(0 0 18px gold); }
+    input[type=range] { width: 220px; }
+    .volts { font-size: 1.4rem; font-weight: 700; color: #facc15; }
+    ol { padding-left: 1.2rem; }
+    .tip { background:#1e293b; border-left:4px solid #facc15; padding:1rem 1.2rem; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p><a class="back" href="../index.html">← 실험 목록으로</a></p>
+    <h1>🍋 레몬 전지 만들기</h1>
+    <p>레몬 속 <strong>산(acid)</strong>은 전기가 흐르게 도와주는 전해질입니다.
+       구리와 아연처럼 성질이 다른 두 금속을 꽂으면 화학 반응이 일어나 전기가 만들어집니다.
+       레몬을 여러 개 연결하면 전압이 커져서 작은 LED도 켤 수 있어요!</p>
+
+    <div class="demo">
+      <div><span class="lemon">🍋</span> × <span id="num">1</span>개</div>
+      <div class="bulb" id="bulb">💡</div>
+      <p>연결한 레몬 개수: <input type="range" min="1" max="6" value="1"
+         oninput="update(this.value)" /></p>
+      <p class="volts"><span id="volts">0.9</span> V</p>
+      <p id="status">아직 전압이 부족해요.</p>
+    </div>
+
+    <h2>준비물</h2>
+    <ul>
+      <li>레몬 4~6개</li>
+      <li>구리판(또는 10원 동전), 아연판(또는 아연 못)</li>
+      <li>집게 전선, 작은 LED</li>
+    </ul>
+
+    <h2>실험 방법</h2>
+    <ol>
+      <li>레몬을 손으로 살짝 눌러 안쪽 즙이 퍼지게 합니다.</li>
+      <li>레몬마다 구리판과 아연판을 서로 닿지 않게 꽂습니다.</li>
+      <li>한 레몬의 구리를 옆 레몬의 아연에 전선으로 연결합니다. (직렬 연결)</li>
+      <li>양 끝의 금속을 LED의 두 다리에 연결합니다.</li>
+      <li>레몬을 늘릴수록 전압이 커져 LED가 밝아집니다!</li>
+    </ol>
+
+    <div class="tip">💡 <strong>왜 그럴까요?</strong> 아연이 산 속으로 녹으면서 전자를 내놓고,
+      그 전자가 전선을 따라 구리 쪽으로 이동하면서 전류가 흐릅니다. 레몬 1개는 약 0.9V,
+      LED를 켜려면 보통 2V 이상이 필요해서 여러 개를 직렬로 잇습니다.</div>
+  </div>
+
+  <script>
+    function update(n) {
+      const volts = (n * 0.9).toFixed(1);
+      document.getElementById('num').textContent = n;
+      document.getElementById('volts').textContent = volts;
+      const bulb = document.getElementById('bulb');
+      const status = document.getElementById('status');
+      if (volts >= 2) {
+        bulb.classList.add('on');
+        status.textContent = '✨ LED가 켜졌어요!';
+      } else {
+        bulb.classList.remove('on');
+        status.textContent = '아직 전압이 부족해요.';
+      }
+    }
+    update(1);
+  </script>
+</body>
+</html>

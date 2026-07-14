@@ -1,0 +1,68 @@
+name: 실험실 자동 배포
+
+# experiments/ 폴더에 새 실험 HTML이 올라오면(push) 자동으로:
+#  1) index.html 을 재생성하고
+#  2) 변경 사항이 있으면 저장소에 커밋한 뒤
+#  3) GitHub Pages 로 배포합니다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'experiments/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  # 필요할 때 수동 실행도 가능
+  workflow_dispatch:
+
+# Pages 배포 및 index.html 커밋에 필요한 권한
+permissions:
+  contents: write   # 생성된 index.html 을 저장소에 다시 커밋하기 위해
+  pages: write      # GitHub Pages 배포
+  id-token: write   # Pages 배포 인증
+
+# 동시에 여러 배포가 겹치지 않도록
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: index.html 자동 생성
+        run: node scripts/build-index.js
+
+      - name: 변경된 index.html 커밋 (변경 시에만)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain index.html)" ]; then
+            git add index.html
+            git commit -m "chore: 실험 목록 자동 갱신 [skip ci]"
+            git push
+          else
+            echo "index.html 변경 없음 — 커밋 건너뜀"
+          fi
+
+      - name: Pages 설정
+        uses: actions/configure-pages@v5
+
+      - name: 사이트 파일 업로드
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .   # 저장소 루트 전체를 정적 사이트로 배포
+
+      - name: GitHub Pages 배포
+        id: deployment
+        uses: actions/deploy-pages@v4
